@@ -96,8 +96,8 @@ This project is licensed under the [MIT License](LICENSE).
 
 Created and maintained by:
 - [Nafees Khan](https://github.com/Nafees-khan-29)
-- [Pruthvi Raj](https://github.com/Pruthvi-123-prog)
-- [Muzammil K3](https://github.com/muzammilk3)
+- [Pruthvi ](https://github.com/Pruthvi-123-prog)
+- [MuzammilK3](https://github.com/muzammilk3)
 
 For queries or collaborations, please open an issue or reach out via GitHub.
 
