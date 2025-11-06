@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import healthLogo from '../../assets/healthlogo.avif'
 import { Navigate, useNavigate } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
+import { syncUserWithBackend, getDashboardPath } from '../../services/roleService';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeItem, setActiveItem] = useState('home');
   const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const { user } = useUser();
 
   // Handle scroll effect
   useEffect(() => {
@@ -17,13 +21,46 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Get user role when logged in
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (user) {
+        try {
+          const userData = await syncUserWithBackend(user);
+          setUserRole(userData.role);
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+        }
+      }
+    };
+
+    fetchUserRole();
+  }, [user]);
+
   const serviceItems = [
     'General Checkup',
     'madical Care',
     'Physical Services',
     'Laboratory Services'
   ];
-  const navigate =useNavigate();
+  const navigate = useNavigate();
+
+  // Handle dashboard navigation based on role
+  const handleDashboardClick = () => {
+    if (userRole) {
+      const dashboardPath = getDashboardPath(userRole);
+      navigate(dashboardPath);
+      setActiveItem('dashboard');
+    }
+  };
+
+  // Get dashboard label based on role
+  const getDashboardLabel = () => {
+    if (!userRole) return 'Dashboard';
+    return userRole === 'admin' ? 'Admin Panel' : 
+           userRole === 'doctor' ? 'Doctor Portal' : 
+           'My Dashboard';
+  };
 
   return (
     <nav className={`fixed w-full z-50 transition-all duration-300 ${
@@ -91,16 +128,47 @@ const Navbar = () => {
                   )}
                 </div>
               ))}
+
+              {/* Role-based Dashboard Button - Only shows when signed in */}
+              <SignedIn>
+                {userRole && (
+                  <button 
+                    onClick={handleDashboardClick}
+                    className={`px-4 py-2 rounded-md text-base font-medium transition-all duration-300
+                      ${activeItem === 'dashboard'
+                        ? 'text-white bg-gradient-to-r from-blue-600 to-purple-600' 
+                        : 'text-white bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600'
+                      } shadow-md hover:shadow-lg transform hover:scale-105`}
+                  >
+                    {getDashboardLabel()}
+                  </button>
+                )}
+              </SignedIn>
             </div>
           </div>
 
-          {/* Login Button */}
-          <div   className="hidden md:block">
-            <button onClick={()=>navigate('/login')} className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-base font-medium
-              hover:bg-blue-700 transform hover:scale-105 transition-all duration-300
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md">
-              Login 
-            </button>
+          {/* Login Button / User Button */}
+          <div className="hidden md:block">
+            <SignedOut>
+              <button 
+                onClick={() => navigate('/login')} 
+                className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-base font-medium
+                  hover:bg-blue-700 transform hover:scale-105 transition-all duration-300
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md"
+              >
+                Login 
+              </button>
+            </SignedOut>
+            <SignedIn>
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-10 h-10 rounded-full border-2 border-blue-500 hover:border-blue-600 transition-all duration-300 shadow-md"
+                  }
+                }}
+              />
+            </SignedIn>
           </div>
 
           {/* Mobile menu updates */}
@@ -141,6 +209,10 @@ const Navbar = () => {
           {['home', 'services', 'doctors', 'contact'].map((item) => (
             <button
               key={item}
+              onClick={() => {
+                navigate(item === 'home' ? '/' : `/${item}`);
+                setIsOpen(false);
+              }}
               className="w-full text-left px-4 py-3 rounded-md text-base font-medium
                 uppercase transition-colors duration-300 text-gray-700
                 hover:bg-blue-500/10 hover:text-blue-600"
@@ -148,10 +220,49 @@ const Navbar = () => {
               {item}
             </button>
           ))}
-          <button onClick={()=>navigate('/login')} className="w-full text-left px-4 py-3 rounded-lg text-base font-medium
-            bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-300">
-            Login 
-          </button>
+          
+          {/* Role-based Dashboard Button for Mobile */}
+          <SignedIn>
+            {userRole && (
+              <button
+                onClick={() => {
+                  handleDashboardClick();
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-4 py-3 rounded-lg text-base font-medium
+                  bg-gradient-to-r from-blue-500 to-purple-500 text-white 
+                  hover:from-blue-600 hover:to-purple-600 transition-all duration-300 shadow-md"
+              >
+                {getDashboardLabel()}
+              </button>
+            )}
+          </SignedIn>
+
+          <SignedOut>
+            <button 
+              onClick={() => {
+                navigate('/login');
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-4 py-3 rounded-lg text-base font-medium
+                bg-blue-600 text-white hover:bg-blue-700 transition-colors duration-300"
+            >
+              Login 
+            </button>
+          </SignedOut>
+          <SignedIn>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-gray-700 font-medium">Account</span>
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-10 h-10 rounded-full border-2 border-blue-500"
+                  }
+                }}
+              />
+            </div>
+          </SignedIn>
         </div>
       </div>
     </nav>

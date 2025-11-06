@@ -1,0 +1,68 @@
+[
+  {
+    "id": "admin-001-2023-uuid-1a2b3c4d5e6f",
+    "full_name": "Dr. Jonathan Carter",
+    "email": "admin@healthcare.com",
+    "password": "Admin@123456",
+    "role": "Super Admin",
+    "department": "Administration",
+    "phone": "+1-555-9999",
+    "employee_id": "ADM-2023-001",
+    "address": "100 Healthcare Admin Plaza, New York, NY 10001",
+    "hospital": "Medicare Central Hospital",
+    "dob": "1975-08-15",
+    "gender": "Male",
+    "registration_date": "2023-01-01",
+    "active": true,
+    "permissions": [
+      "manage_doctors",
+      "manage_patients",
+      "manage_appointments",
+      "view_reports",
+      "manage_users",
+      "system_settings"
+    ]
+  },
+  {
+    "id": "admin-002-2023-uuid-2b3c4d5e6f7a",
+    "full_name": "Ms. Patricia Johnson",
+    "email": "patricia.johnson@healthcare.com",
+    "password": "Patricia@2023",
+    "role": "Admin",
+    "department": "Patient Services",
+    "phone": "+1-555-9998",
+    "employee_id": "ADM-2023-002",
+    "address": "100 Healthcare Admin Plaza, New York, NY 10001",
+    "hospital": "Medicare Central Hospital",
+    "dob": "1982-04-22",
+    "gender": "Female",
+    "registration_date": "2023-02-15",
+    "active": true,
+    "permissions": [
+      "manage_patients",
+      "manage_appointments",
+      "view_reports"
+    ]
+  },
+  {
+    "id": "admin-003-2023-uuid-3c4d5e6f7a8b",
+    "full_name": "Mr. Marcus Thompson",
+    "email": "marcus.thompson@healthcare.com",
+    "password": "Marcus@2023",
+    "role": "Admin",
+    "department": "Medical Records",
+    "phone": "+1-555-9997",
+    "employee_id": "ADM-2023-003",
+    "address": "100 Healthcare Admin Plaza, New York, NY 10001",
+    "hospital": "Medicare Central Hospital",
+    "dob": "1988-11-10",
+    "gender": "Male",
+    "registration_date": "2023-03-20",
+    "active": true,
+    "permissions": [
+      "manage_patients",
+      "view_reports",
+      "manage_appointments"
+    ]
+  }
+]

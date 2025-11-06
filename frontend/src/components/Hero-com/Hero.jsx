@@ -1,9 +1,20 @@
 import React from 'react'
 import headerImage from '../../assets/assets_frontend/header_img.png'
 import { useNavigate } from 'react-router-dom'
+import { useUser } from '@clerk/clerk-react'
 
 const Hero = () => {
   const navigate = useNavigate();
+  const { isSignedIn } = useUser();
+
+  const handleBookAppointment = () => {
+    if (isSignedIn) {
+      navigate('/appointment');
+    } else {
+      navigate('/login');
+    }
+  };
+
   return (
 <div className="relative bg-gradient-to-r from-[#54a6f4] via-[#c4d7e6] to-[#ffffff] min-h-screen text-white">
   {/* Header nav space */}
@@ -41,7 +52,7 @@ const Hero = () => {
           </div>
         </div>
                 <button
-          onClick={() => navigate('/login')}
+          onClick={handleBookAppointment}
          className="bg-blue-600 text-white px-6 py-3 rounded-full text-base font-medium
               hover:bg-blue-700 transform hover:scale-105 transition-all duration-300
               focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md "

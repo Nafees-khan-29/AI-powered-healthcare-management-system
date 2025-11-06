@@ -10,9 +10,9 @@ import {
   FaCog,
   FaHome
 } from 'react-icons/fa';
-import UserDashboard from '../components/Dashboard/UserDashboard';
-import DoctorDashboard from '../components/Dashboard/DoctorDashboard';
-import AdminDashboard from '../components/Dashboard/AdminDashboard';
+import UserDashboard from '../components/Dashboard/User/UserDashboard';
+import DoctorDashboard from '../components/Dashboard/Doctor/DoctorDashboard';
+import AdminDashboard from '../components/Dashboard/Admin/AdminDashboard';
 import './Dashboard.css';
 
 const Dashboard = () => {

@@ -1,11 +1,29 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { doctorsData, categories } from '../Hero-com/DoctorList';
+import { useNavigate } from "react-router-dom";
+import { useUser } from '@clerk/clerk-react';
+
 
 const DoctorsComponent = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const navigate = useNavigate();
+  const { isSignedIn } = useUser(); 
+
+  // Handle book appointment with authentication check
+  const handleBookAppointment = (doctor) => {
+    if (isSignedIn) {
+      // Store selected doctor in localStorage
+      localStorage.setItem('selectedDoctor', JSON.stringify(doctor));
+      navigate('/appointment');
+    } else {
+      // Store doctor info for after login and redirect to login
+      localStorage.setItem('selectedDoctor', JSON.stringify(doctor));
+      navigate('/login');
+    }
+  };
 
   // Get all doctors for "All" category
   const allDoctors = Object.values(doctorsData).flat();
@@ -123,8 +141,11 @@ const DoctorsComponent = () => {
                     <p>Available: {doctor.availability}</p>
                     <p>Education: {doctor.education}</p>
                   </div>
-                  <button className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors">
-                    Book Appointment
+                  <button 
+                    onClick={() => handleBookAppointment(doctor)} 
+                    className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Book Appointment 
                   </button>
                 </div>
               </motion.div>

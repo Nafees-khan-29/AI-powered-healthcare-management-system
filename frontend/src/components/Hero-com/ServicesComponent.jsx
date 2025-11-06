@@ -130,7 +130,7 @@ const Services = () => {
           </div>
 
           {/* Services Cards */}
-          <div className="flex gap-6 overflow-x-auto pb-8 scrollbar-hide">
+          <div className="flex gap-6 overflow-y-auto p-8 scrollbar-hide h-auto">
             {services.map((service, index) => (
               <div key={index} className="cube-container">
                 <div className="cube is-rotating">

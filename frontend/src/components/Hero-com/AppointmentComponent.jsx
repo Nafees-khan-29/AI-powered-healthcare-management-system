@@ -18,10 +18,12 @@ import {
   FaHeartbeat,
   FaGraduationCap,
   FaAward,
-  FaLanguage
+  FaLanguage,
+  FaUserMd
 } from 'react-icons/fa';
 import { format } from 'date-fns';
 import Calendar from 'react-calendar';
+import { useNavigate } from 'react-router-dom';
 import './Appointment.css';
 
 // Enhanced time slots with availability status
@@ -41,6 +43,8 @@ const timeSlots = [
 ];
 
 const AppointmentComponent = () => {
+  const navigate = useNavigate();
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState('');
@@ -50,6 +54,18 @@ const AppointmentComponent = () => {
   const [formErrors, setFormErrors] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Load selected doctor from localStorage on component mount
+  useEffect(() => {
+    const storedDoctor = localStorage.getItem('selectedDoctor');
+    if (storedDoctor) {
+      try {
+        setSelectedDoctor(JSON.parse(storedDoctor));
+      } catch (error) {
+        console.error('Error parsing stored doctor data:', error);
+      }
+    }
+  }, []);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -454,7 +470,12 @@ const AppointmentComponent = () => {
                 </div>
                 <div className="bg-white p-4 rounded-xl">
                   <h5 className="font-medium text-gray-700 mb-2">Doctor</h5>
-                  <p className="text-blue-600 font-semibold">Dr. Sarah Johnson</p>
+                  <p className="text-blue-600 font-semibold">
+                    {selectedDoctor ? selectedDoctor.name : 'No doctor selected'}
+                  </p>
+                  {selectedDoctor && (
+                    <p className="text-gray-600 text-sm mt-1">{selectedDoctor.specialization}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -551,90 +572,128 @@ const AppointmentComponent = () => {
           
           {/* Enhanced Doctor Details Card */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-3xl shadow-2xl overflow-hidden transform transition-all hover:scale-[1.02] sticky top-24">
-              <div className="relative">
-                <img 
-                  src="/doctor-image.jpg" 
-                  alt="Dr. Sarah Johnson" 
-                  className="w-full h-80 object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <h2 className="text-3xl font-bold text-white mb-2">Dr. Sarah Johnson</h2>
-                  <p className="text-blue-300 text-lg mb-3">Senior Cardiologist</p>
-                  <div className="flex items-center gap-2 text-white/90">
-                    <FaHeartbeat className="text-red-400" />
-                    <span>Cardiology Specialist</span>
+            {selectedDoctor ? (
+              <div className="bg-white rounded-3xl shadow-2xl overflow-hidden transform transition-all hover:scale-[1.02] sticky top-24">
+                <div className="relative">
+                  <img 
+                    src={selectedDoctor.image || "/doctor-image.jpg"} 
+                    alt={selectedDoctor.name} 
+                    className="w-full h-80 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <h2 className="text-3xl font-bold text-white mb-2">{selectedDoctor.name}</h2>
+                    <p className="text-blue-300 text-lg mb-3">{selectedDoctor.specialization}</p>
+                    <div className="flex items-center gap-2 text-white/90">
+                      <FaHeartbeat className="text-red-400" />
+                      <span>{selectedDoctor.specialization} Specialist</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                  {/* Rating */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <FaStar key={star} className="text-yellow-400 w-5 h-5" />
+                      ))}
+                    </div>
+                    <span className="text-gray-600 font-medium">4.9 (128 reviews)</span>
+                  </div>
+
+                  {/* Doctor Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-4 bg-blue-50 rounded-xl">
+                      <div className="text-2xl font-bold text-blue-600">{selectedDoctor.experience || '15+'}+</div>
+                      <div className="text-sm text-gray-600">Years Experience</div>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-xl">
+                      <div className="text-2xl font-bold text-green-600">2.5k+</div>
+                      <div className="text-sm text-gray-600">Patients Treated</div>
+                    </div>
+                  </div>
+
+                  {/* Qualifications */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <FaGraduationCap className="text-blue-600 text-xl" />
+                      <div>
+                        <div className="font-semibold text-gray-800">{selectedDoctor.education || 'MBBS, MD'}</div>
+                        <div className="text-sm text-gray-600">Medical University</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <FaAward className="text-yellow-600 text-xl" />
+                      <div>
+                        <div className="font-semibold text-gray-800">Board Certified</div>
+                        <div className="text-sm text-gray-600">Medical Board</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <FaMapMarkerAlt className="text-red-600 text-xl" />
+                      <div>
+                        <div className="font-semibold text-gray-800">City Hospital</div>
+                        <div className="text-sm text-gray-600">Downtown Medical Center</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <FaClock className="text-purple-600 text-xl" />
+                      <div>
+                        <div className="font-semibold text-gray-800">Available</div>
+                        <div className="text-sm text-gray-600">{selectedDoctor.availability || 'Mon-Fri: 9AM-5PM'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Change Doctor Button */}
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem('selectedDoctor');
+                      navigate('/doctors');
+                    }}
+                    className="w-full py-3 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                  >
+                    Change Doctor
+                  </button>
+
+                  {/* Consultation Fee */}
+                  <div className="text-center p-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white">
+                    <div className="text-sm opacity-90">Consultation Fee</div>
+                    <div className="text-3xl font-bold">700 INR</div>
+                    <div className="text-sm opacity-90">Insurance accepted</div>
                   </div>
                 </div>
               </div>
-              
-              <div className="p-6 space-y-6">
-                {/* Rating */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <FaStar key={star} className="text-yellow-400 w-5 h-5" />
-                    ))}
+            ) : (
+              <div className="bg-white rounded-3xl shadow-2xl overflow-hidden sticky top-24">
+                <div className="p-8 text-center space-y-6">
+                  <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                    <FaUserMd className="text-5xl text-blue-600" />
                   </div>
-                  <span className="text-gray-600 font-medium">4.9 (128 reviews)</span>
-                </div>
-
-                {/* Doctor Stats */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-xl">
-                    <div className="text-2xl font-bold text-blue-600">15+</div>
-                    <div className="text-sm text-gray-600">Years Experience</div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-800 mb-2">No Doctor Selected</h3>
+                    <p className="text-gray-600 mb-6">
+                      Please select a doctor from our specialists to continue with your appointment booking.
+                    </p>
                   </div>
-                  <div className="text-center p-4 bg-green-50 rounded-xl">
-                    <div className="text-2xl font-bold text-green-600">2.5k+</div>
-                    <div className="text-sm text-gray-600">Patients Treated</div>
+                  <button
+                    onClick={() => navigate('/doctors')}
+                    className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                  >
+                    Select a Doctor
+                  </button>
+                  <div className="pt-6 border-t border-gray-200">
+                    <p className="text-sm text-gray-500">
+                      Browse through our experienced doctors and choose the one that best fits your needs.
+                    </p>
                   </div>
-                </div>
-
-                {/* Qualifications */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <FaGraduationCap className="text-blue-600 text-xl" />
-                    <div>
-                      <div className="font-semibold text-gray-800">MBBS, MD - Cardiology</div>
-                      <div className="text-sm text-gray-600">Harvard Medical School</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <FaAward className="text-yellow-600 text-xl" />
-                    <div>
-                      <div className="font-semibold text-gray-800">Board Certified</div>
-                      <div className="text-sm text-gray-600">American Board of Cardiology</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <FaMapMarkerAlt className="text-red-600 text-xl" />
-                    <div>
-                      <div className="font-semibold text-gray-800">City Hospital</div>
-                      <div className="text-sm text-gray-600">Downtown Medical Center</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <FaLanguage className="text-purple-600 text-xl" />
-                    <div>
-                      <div className="font-semibold text-gray-800">Languages</div>
-                      <div className="text-sm text-gray-600">English, Spanish, French</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Consultation Fee */}
-                <div className="text-center p-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white">
-                  <div className="text-sm opacity-90">Consultation Fee</div>
-                  <div className="text-3xl font-bold">$150</div>
-                  <div className="text-sm opacity-90">Insurance accepted</div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Main Content Area */}
@@ -708,7 +767,9 @@ const AppointmentComponent = () => {
                   {format(selectedDate, 'MMMM do, yyyy')}
                 </p>
                 <p className="text-blue-600 font-bold text-xl">{selectedTime}</p>
-                <p className="text-gray-600 text-sm">with Dr. Sarah Johnson</p>
+                <p className="text-gray-600 text-sm">
+                  with {selectedDoctor ? selectedDoctor.name : 'your selected doctor'}
+                </p>
               </div>
               <p className="text-gray-600 mb-6">
                 You will receive a confirmation email with appointment details and preparation instructions.
