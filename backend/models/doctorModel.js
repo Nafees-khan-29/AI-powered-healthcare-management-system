@@ -5,9 +5,7 @@ const doctorSchema = new mongoose.Schema(
        name:{
             type:String,
             required:true
-
        },
-         
        email:{
             type:String,
             required:true,
@@ -16,54 +14,62 @@ const doctorSchema = new mongoose.Schema(
         password:{
             type:String,
             required:true
-
         },
         image:{
             type:String,
             required:true
         },
-        spetiality:{
+        specialization:{
             type:String,
             required:true
         },
         degree:{
             type:String,
             required:true
-
         },
-        experiance:{
+        experience:{
             type:String,
             required:true
         },
         available:{
             type:Boolean,
-            required:true
+            default:true
         },
         fees:{
             type:Number,
             required:true
         },
         address:{
-            type:number,
+            type:String,
             required:true
+        },
+        phone:{
+            type:String,
+            required:false
+        },
+        education:{
+            type:String,
+            required:false
+        },
+        availability:{
+            type:String,
+            default:'Mon-Fri: 9AM-5PM'
+        },
+        rating:{
+            type:Number,
+            default:4.5
         },
         date:{
             type:Number,
-            required:true
+            default:Date.now
         },
         slots_booked:{
             type:Object,
-            required:{}
+            default:{}
         }
-
-
-
-
-
-
-
-    },{minimize:false}
+    },{minimize:false, timestamps:true}
 )
+
 const doctorModel=mongoose.models.doctor|| mongoose.model('doctor',doctorSchema);
 
 export default doctorModel;

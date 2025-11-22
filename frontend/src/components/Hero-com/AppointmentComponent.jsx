@@ -24,35 +24,42 @@ import {
 import { format } from 'date-fns';
 import Calendar from 'react-calendar';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
+import { createAppointment, getBookedSlots } from '../../services/appointmentService';
 import './Appointment.css';
 
 // Enhanced time slots with availability status
-const timeSlots = [
-  { time: '09:00 AM', available: true, popular: true },
-  { time: '09:30 AM', available: true, popular: false },
-  { time: '10:00 AM', available: false, popular: false },
-  { time: '10:30 AM', available: true, popular: false },
-  { time: '11:00 AM', available: true, popular: true },
-  { time: '11:30 AM', available: true, popular: false },
-  { time: '02:00 PM', available: true, popular: true },
-  { time: '02:30 PM', available: true, popular: false },
-  { time: '03:00 PM', available: false, popular: false },
-  { time: '03:30 PM', available: true, popular: false },
-  { time: '04:00 PM', available: true, popular: true },
-  { time: '04:30 PM', available: true, popular: false }
+const allTimeSlots = [
+  { time: '09:00 AM', popular: true },
+  { time: '09:30 AM', popular: false },
+  { time: '10:00 AM', popular: false },
+  { time: '10:30 AM', popular: false },
+  { time: '11:00 AM', popular: true },
+  { time: '11:30 AM', popular: false },
+  { time: '02:00 PM', popular: true },
+  { time: '02:30 PM', popular: false },
+  { time: '03:00 PM', popular: false },
+  { time: '03:30 PM', popular: false },
+  { time: '04:00 PM', popular: true },
+  { time: '04:30 PM', popular: false }
 ];
 
 const AppointmentComponent = () => {
   const navigate = useNavigate();
+  const { user } = useUser();
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [actualFiles, setActualFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
+  const [appointmentId, setAppointmentId] = useState(null);
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const fileInputRef = useRef(null);
 
   // Load selected doctor from localStorage on component mount
@@ -66,6 +73,36 @@ const AppointmentComponent = () => {
       }
     }
   }, []);
+
+  // Fetch booked slots when doctor or date changes
+  useEffect(() => {
+    const fetchBookedSlots = async () => {
+      if (!selectedDoctor?.email || !selectedDate) return;
+      
+      setLoadingSlots(true);
+      try {
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        console.log(`🔍 Fetching booked slots for ${selectedDoctor.email} on ${dateStr}`);
+        
+        const result = await getBookedSlots(selectedDoctor.email, dateStr);
+        
+        if (result.success) {
+          console.log(`✅ Booked slots:`, result.bookedSlots);
+          setBookedSlots(result.bookedSlots || []);
+        } else {
+          console.warn('Failed to fetch booked slots:', result.message);
+          setBookedSlots([]);
+        }
+      } catch (error) {
+        console.error('Error fetching booked slots:', error);
+        setBookedSlots([]);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    fetchBookedSlots();
+  }, [selectedDoctor, selectedDate]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -107,6 +144,11 @@ const AppointmentComponent = () => {
 
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
+    
+    // Store actual file objects for API upload
+    setActualFiles([...actualFiles, ...files]);
+    
+    // Store file metadata for display
     const newFiles = files.map(file => ({
       name: file.name,
       size: (file.size / 1024 / 1024).toFixed(2),
@@ -117,6 +159,10 @@ const AppointmentComponent = () => {
   };
 
   const removeFile = (id) => {
+    const index = uploadedFiles.findIndex(file => file.id === id);
+    if (index !== -1) {
+      setActualFiles(actualFiles.filter((_, i) => i !== index));
+    }
     setUploadedFiles(uploadedFiles.filter(file => file.id !== id));
   };
 
@@ -156,11 +202,71 @@ const AppointmentComponent = () => {
     e.preventDefault();
     if (!isFormValid) return;
     
+    // Check if doctor is selected
+    if (!selectedDoctor) {
+      alert('Please select a doctor first');
+      navigate('/doctors');
+      return;
+    }
+    
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    setShowModal(true);
+    
+    try {
+      // Prepare appointment data
+      const appointmentData = {
+        patientName: formData.name,
+        patientEmail: formData.email,
+        patientPhone: formData.phone,
+        patientAge: parseInt(formData.age),
+        patientGender: formData.gender,
+        doctorId: selectedDoctor._id || 'temp-id',
+        doctorName: selectedDoctor.name,
+        doctorSpecialization: selectedDoctor.specialization,
+        doctorEmail: selectedDoctor.email || null,
+        doctorClerkUserId: selectedDoctor.clerkUserId || null,
+        appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
+        appointmentTime: selectedTime,
+        symptoms: formData.symptom,
+        additionalNotes: formData.notes,
+        emergencyContact: formData.emergencyContact,
+        insuranceProvider: formData.insuranceProvider,
+        previousConditions: formData.previousConditions,
+        clerkUserId: user?.id || null,
+        userId: user?.primaryEmailAddress?.emailAddress || formData.email
+      };
+
+      console.log('📤 Creating appointment:', appointmentData);
+      console.log('👨‍⚕️ Selected doctor object:', selectedDoctor);
+      console.log('📧 Doctor email being sent:', selectedDoctor.email);
+      
+      // Call API to create appointment with files
+      const result = await createAppointment(appointmentData, actualFiles);
+      
+      console.log('✅ Appointment created successfully:', result);
+      
+      // Store appointment ID
+      setAppointmentId(result.appointment._id);
+      
+      // Show success modal
+      setShowModal(true);
+      
+      // Clear selected doctor after successful booking
+      setTimeout(() => {
+        localStorage.removeItem('selectedDoctor');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Error creating appointment:', error);
+      
+      // Check if it's a 409 conflict error (slot already booked)
+      if (error.message && error.message.includes('already booked')) {
+        alert(`⚠️ Time Slot Unavailable\n\nThe selected time slot is already booked for this doctor. Please choose a different time.\n\nDoctor: ${selectedDoctor.name}\nDate: ${format(selectedDate, 'MMMM do, yyyy')}\nTime: ${selectedTime}`);
+      } else {
+        alert(`Failed to create appointment: ${error.message}\n\nPlease try again or contact support.`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderStepContent = () => {
@@ -170,7 +276,7 @@ const AppointmentComponent = () => {
           <div className="space-y-6">
             <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-gray-800 mb-2">Choose Your Preferred Time</h3>
-              <p className="text-gray-600">Select a date and time that works best for you</p>
+              <p className="text-gray-800">Select a date and time that works best for you</p>
               </div>
               
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6">
@@ -183,37 +289,43 @@ const AppointmentComponent = () => {
             </div>
             
             <div className="bg-white rounded-2xl p-6 shadow-lg">
-              <h4 className="text-lg font-semibold mb-4 text-gray-800 flex items-center gap-2">
+              <h4 className="text-lg font-semibold mb-4 text-gray-900 flex items-center gap-2">
                 <FaClock className="text-blue-600" />
                 Available Time Slots for {format(selectedDate, 'MMMM do, yyyy')}
+                {loadingSlots && <FaSpinner className="animate-spin text-blue-500 text-sm" />}
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {timeSlots.map((slot) => (
+                {allTimeSlots.map((slot) => {
+                  const isBooked = bookedSlots.includes(slot.time);
+                  const isAvailable = !isBooked;
+                  
+                  return (
                     <button
-                    key={slot.time}
-                    onClick={() => setSelectedTime(slot.time)}
-                    disabled={!slot.available}
-                    className={`relative p-3 rounded-xl text-sm font-medium transition-all transform hover:scale-105 ${
-                      selectedTime === slot.time
-                        ? 'bg-blue-600 text-white shadow-lg scale-105 ring-4 ring-blue-200'
-                        : slot.available
-                        ? 'bg-white hover:bg-blue-50 text-gray-800 border-2 border-gray-200 hover:border-blue-300'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {slot.time}
-                    {slot.popular && slot.available && (
-                      <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
-                        Popular
-                      </span>
-                    )}
-                    {!slot.available && (
-                      <span className="absolute inset-0 bg-gray-200 rounded-xl flex items-center justify-center">
-                        <span className="text-xs">Booked</span>
-                      </span>
-                    )}
+                      key={slot.time}
+                      onClick={() => isAvailable && setSelectedTime(slot.time)}
+                      disabled={!isAvailable}
+                      className={`relative p-3 rounded-xl text-sm font-medium transition-all transform ${
+                        selectedTime === slot.time
+                          ? 'bg-blue-600 text-white shadow-lg scale-105 ring-4 ring-blue-200'
+                          : isAvailable
+                          ? 'bg-white hover:bg-blue-50 text-gray-800 border-2 border-gray-200 hover:border-blue-300 hover:scale-105'
+                          : 'bg-gray-100 text-gray-400 border-2 border-gray-200 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      {slot.time}
+                      {slot.popular && isAvailable && (
+                        <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full">
+                          Popular
+                        </span>
+                      )}
+                      {isBooked && (
+                        <span className="absolute inset-0 bg-red-100 rounded-xl flex items-center justify-center border-2 border-red-300">
+                          <span className="text-xs text-red-600 font-semibold">Booked</span>
+                        </span>
+                      )}
                     </button>
-                  ))}
+                  );
+                })}
                 </div>
               </div>
             </div>
@@ -420,7 +532,7 @@ const AppointmentComponent = () => {
                     <FaUpload className="text-xl" />
                     <span className="font-medium">Upload Medical Reports</span>
                       </button>
-                  <p className="text-sm text-gray-500 mt-2">Supports PDF, JPG, PNG, DOC files (Max 10MB each)</p>
+                  <p className="text-sm text-gray-800 mt-2">Supports PDF, JPG, PNG, DOC files (Max 10MB each)</p>
                     </div>
 
                     {/* File List */}
@@ -432,7 +544,7 @@ const AppointmentComponent = () => {
                           <FaFileAlt className="text-blue-600 text-xl" />
                           <div>
                             <span className="font-medium text-gray-800">{file.name}</span>
-                            <span className="text-sm text-gray-500 ml-2">({file.size} MB)</span>
+                            <span className="text-sm text-gray-800 ml-2">({file.size} MB)</span>
                           </div>
                             </div>
                             <button
@@ -456,25 +568,25 @@ const AppointmentComponent = () => {
           <div className="space-y-6">
             <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-gray-800 mb-2">Review Your Appointment</h3>
-              <p className="text-gray-600">Please review all details before confirming</p>
+              <p className="text-gray-800">Please review all details before confirming</p>
             </div>
             
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6">
               <h4 className="text-lg font-semibold mb-4 text-gray-800">Appointment Summary</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white p-4 rounded-xl">
-                  <h5 className="font-medium text-gray-700 mb-2">Date & Time</h5>
+                  <h5 className="font-medium text-gray-800 mb-2">Date & Time</h5>
                   <p className="text-blue-600 font-semibold">
                     {format(selectedDate, 'MMMM do, yyyy')} at {selectedTime}
                   </p>
                 </div>
                 <div className="bg-white p-4 rounded-xl">
-                  <h5 className="font-medium text-gray-700 mb-2">Doctor</h5>
+                  <h5 className="font-medium text-gray-800 mb-2">Doctor</h5>
                   <p className="text-blue-600 font-semibold">
                     {selectedDoctor ? selectedDoctor.name : 'No doctor selected'}
                   </p>
                   {selectedDoctor && (
-                    <p className="text-gray-600 text-sm mt-1">{selectedDoctor.specialization}</p>
+                    <p className="text-gray-800 text-sm mt-1">{selectedDoctor.specialization}</p>
                   )}
                 </div>
               </div>
@@ -484,23 +596,23 @@ const AppointmentComponent = () => {
               <h4 className="text-lg font-semibold mb-4 text-gray-800">Patient Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <span className="text-gray-600">Name:</span>
+                  <span className="text-gray-800">Name:</span>
                   <span className="ml-2 font-medium">{formData.name}</span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Age:</span>
+                  <span className="text-gray-800">Age:</span>
                   <span className="ml-2 font-medium">{formData.age} years</span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Gender:</span>
+                  <span className="text-gray-800">Gender:</span>
                   <span className="ml-2 font-medium capitalize">{formData.gender}</span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Phone:</span>
+                  <span className="text-gray-800">Phone:</span>
                   <span className="ml-2 font-medium">{formData.phone}</span>
                 </div>
                 <div className="md:col-span-2">
-                  <span className="text-gray-600">Email:</span>
+                  <span className="text-gray-800">Email:</span>
                   <span className="ml-2 font-medium">{formData.email}</span>
                 </div>
               </div>
@@ -510,18 +622,18 @@ const AppointmentComponent = () => {
               <h4 className="text-lg font-semibold mb-4 text-gray-800">Medical Information</h4>
               <div className="space-y-3">
                 <div>
-                  <span className="text-gray-600">Symptoms:</span>
+                  <span className="text-gray-700">Symptoms:</span>
                   <p className="mt-1 text-gray-800">{formData.symptom}</p>
                 </div>
                 {formData.notes && (
                   <div>
-                    <span className="text-gray-600">Additional Notes:</span>
+                    <span className="text-gray-700">Additional Notes:</span>
                     <p className="mt-1 text-gray-800">{formData.notes}</p>
                   </div>
                 )}
                 {uploadedFiles.length > 0 && (
                   <div>
-                    <span className="text-gray-600">Attached Files:</span>
+                    <span className="text-gray-700">Attached Files:</span>
                     <p className="mt-1 text-gray-800">{uploadedFiles.length} file(s)</p>
                   </div>
                 )}
@@ -548,12 +660,12 @@ const AppointmentComponent = () => {
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold transition-all duration-300 ${
                     currentStep >= step.id
                       ? 'bg-blue-600 text-white shadow-lg scale-110'
-                      : 'bg-gray-200 text-gray-500'
+                      : 'bg-gray-200 text-gray-900'
                   }`}>
                     {currentStep > step.id ? <FaCheckCircle /> : <step.icon />}
                   </div>
                   <span className={`mt-2 text-sm font-medium transition-colors ${
-                    currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
+                    currentStep >= step.id ? 'text-blue-600' : 'text-gray-900'
                   }`}>
                     {step.title}
                   </span>
@@ -599,18 +711,18 @@ const AppointmentComponent = () => {
                         <FaStar key={star} className="text-yellow-400 w-5 h-5" />
                       ))}
                     </div>
-                    <span className="text-gray-600 font-medium">4.9 (128 reviews)</span>
+                    <span className="text-gray-900 font-medium">4.9 (128 reviews)</span>
                   </div>
 
                   {/* Doctor Stats */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 bg-blue-50 rounded-xl">
                       <div className="text-2xl font-bold text-blue-600">{selectedDoctor.experience || '15+'}+</div>
-                      <div className="text-sm text-gray-600">Years Experience</div>
+                      <div className="text-sm text-gray-900">Years Experience</div>
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-xl">
                       <div className="text-2xl font-bold text-green-600">2.5k+</div>
-                      <div className="text-sm text-gray-600">Patients Treated</div>
+                      <div className="text-sm text-gray-900">Patients Treated</div>
                     </div>
                   </div>
 
@@ -619,32 +731,32 @@ const AppointmentComponent = () => {
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                       <FaGraduationCap className="text-blue-600 text-xl" />
                       <div>
-                        <div className="font-semibold text-gray-800">{selectedDoctor.education || 'MBBS, MD'}</div>
-                        <div className="text-sm text-gray-600">Medical University</div>
+                        <div className="font-semibold text-gray-900">{selectedDoctor.education || 'MBBS, MD'}</div>
+                        <div className="text-sm text-gray-900">Medical University</div>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                       <FaAward className="text-yellow-600 text-xl" />
                       <div>
-                        <div className="font-semibold text-gray-800">Board Certified</div>
-                        <div className="text-sm text-gray-600">Medical Board</div>
+                        <div className="font-semibold text-gray-900">Board Certified</div>
+                        <div className="text-sm text-gray-900">Medical Board</div>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                       <FaMapMarkerAlt className="text-red-600 text-xl" />
                       <div>
-                        <div className="font-semibold text-gray-800">City Hospital</div>
-                        <div className="text-sm text-gray-600">Downtown Medical Center</div>
+                        <div className="font-semibold text-gray-900">City Hospital</div>
+                        <div className="text-sm text-gray-900">Downtown Medical Center</div>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                       <FaClock className="text-purple-600 text-xl" />
                       <div>
-                        <div className="font-semibold text-gray-800">Available</div>
-                        <div className="text-sm text-gray-600">{selectedDoctor.availability || 'Mon-Fri: 9AM-5PM'}</div>
+                        <div className="font-semibold text-gray-900">Available</div>
+                        <div className="text-sm text-gray-900">{selectedDoctor.availability || 'Mon-Fri: 9AM-5PM'}</div>
                       </div>
                     </div>
                   </div>
@@ -655,7 +767,7 @@ const AppointmentComponent = () => {
                       localStorage.removeItem('selectedDoctor');
                       navigate('/doctors');
                     }}
-                    className="w-full py-3 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                    className="w-full py-3 px-4 bg-gray-100 text-gray-900 rounded-xl hover:bg-gray-200 transition-colors font-medium"
                   >
                     Change Doctor
                   </button>
@@ -676,7 +788,7 @@ const AppointmentComponent = () => {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-gray-800 mb-2">No Doctor Selected</h3>
-                    <p className="text-gray-600 mb-6">
+                    <p className="text-gray-900 mb-6">
                       Please select a doctor from our specialists to continue with your appointment booking.
                     </p>
                   </div>
@@ -687,7 +799,7 @@ const AppointmentComponent = () => {
                     Select a Doctor
                   </button>
                   <div className="pt-6 border-t border-gray-200">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-900">
                       Browse through our experienced doctors and choose the one that best fits your needs.
                     </p>
                   </div>
@@ -708,8 +820,8 @@ const AppointmentComponent = () => {
                   disabled={currentStep === 1}
                   className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
                     currentStep === 1
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:scale-105'
+                      ? 'bg-gray-100 text-gray-800 cursor-not-allowed'
+                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200 hover:scale-105'
                   }`}
                 >
                   <FaArrowLeft />
@@ -730,7 +842,7 @@ const AppointmentComponent = () => {
                     disabled={!isFormValid || isLoading}
                     className={`flex items-center gap-2 px-8 py-3 rounded-xl font-medium transition-all ${
                       !isFormValid || isLoading
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        ? 'bg-gray-300 text-gray-900 cursor-not-allowed'
                         : 'bg-green-600 text-white hover:bg-green-700 hover:scale-105 shadow-lg'
                     }`}
                   >

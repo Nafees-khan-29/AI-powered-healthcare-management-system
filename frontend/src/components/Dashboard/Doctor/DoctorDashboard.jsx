@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
+import { getDoctorAppointments, updateAppointmentStatus, cancelAppointment } from '../../../services/appointmentService';
 import {
   FaUserMd,
   FaCalendarAlt,
@@ -14,6 +16,7 @@ import {
   FaClock,
   FaCheckCircle,
   FaExclamationTriangle,
+  FaExclamationCircle,
   FaUser,
   FaPhone,
   FaEnvelope,
@@ -34,7 +37,8 @@ import {
 } from 'react-icons/fa';
 import './DoctorDashboard.css';
 
-const DoctorDashboard = ({ user }) => {
+const DoctorDashboard = () => {
+  const { user, isLoaded } = useUser();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -42,63 +46,174 @@ const DoctorDashboard = ({ user }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDate, setFilterDate] = useState('all');
+  
+  // State for appointments
+  const [appointments, setAppointments] = useState([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data
-  const appointments = [
-    {
-      id: 1,
-      patientName: 'John Smith',
-      patientId: 'P001',
-      date: '2024-01-15',
-      time: '09:00 AM',
-      type: 'Consultation',
-      status: 'confirmed',
-      priority: 'high',
-      symptoms: 'Fever, headache, fatigue',
-      phone: '+1-555-0123',
-      email: 'john.smith@email.com'
-    },
-    {
-      id: 2,
-      patientName: 'Sarah Johnson',
-      patientId: 'P002',
-      date: '2024-01-15',
-      time: '10:30 AM',
-      type: 'Follow-up',
-      status: 'pending',
-      priority: 'medium',
-      symptoms: 'Chest pain, shortness of breath',
-      phone: '+1-555-0124',
-      email: 'sarah.johnson@email.com'
-    },
-    {
-      id: 3,
-      patientName: 'Michael Brown',
-      patientId: 'P003',
-      date: '2024-01-15',
-      time: '02:00 PM',
-      type: 'Emergency',
-      status: 'urgent',
-      priority: 'critical',
-      symptoms: 'Severe abdominal pain, vomiting',
-      phone: '+1-555-0125',
-      email: 'michael.brown@email.com'
-    },
-    {
-      id: 4,
-      patientName: 'Emily Davis',
-      patientId: 'P004',
-      date: '2024-01-16',
-      time: '11:00 AM',
-      type: 'Routine Check',
-      status: 'confirmed',
-      priority: 'low',
-      symptoms: 'Annual physical examination',
-      phone: '+1-555-0126',
-      email: 'emily.davis@email.com'
+  // Fetch appointments function (extracted for manual refresh)
+  const fetchAppointments = async () => {
+    if (!user?.id || !isLoaded) return;
+    
+    console.log('🔄 fetchAppointments called - Starting to fetch...');
+    
+    try {
+      setIsLoadingAppointments(true);
+      setError(null);
+      
+      // Get the doctor's email from Clerk user
+      const doctorEmail = user?.primaryEmailAddress?.emailAddress;
+      
+      console.log('📧 Doctor email:', doctorEmail);
+      
+      // Use email to fetch appointments (since appointments are linked by email)
+      const result = await getDoctorAppointments(doctorEmail || user.id);
+      
+      console.log('📥 Fetched appointments result:', result);
+      console.log(`📊 Number of appointments fetched: ${result.appointments?.length || 0}`);
+      
+      if (result.success) {
+        // Transform API response to component format
+        const transformedAppointments = result.appointments
+          .filter(apt => apt.status !== 'cancelled') // Filter out cancelled appointments
+          .map(apt => ({
+            id: apt._id,
+            patientName: apt.patientName,
+            patientId: apt._id.substring(0, 8).toUpperCase(),
+            date: apt.appointmentDate,
+            time: apt.appointmentTime,
+            type: 'Consultation',
+            status: apt.status,
+            priority: apt.status === 'urgent' ? 'critical' : apt.status === 'confirmed' ? 'high' : 'medium',
+            symptoms: apt.symptoms || 'Not specified',
+            phone: apt.patientPhone,
+            email: apt.patientEmail,
+            age: apt.patientAge,
+            gender: apt.patientGender,
+            medicalReports: apt.medicalReports || []
+          }));
+        
+        console.log('✅ Transformed appointments:', transformedAppointments);
+        console.log('📝 Statuses:', transformedAppointments.map(a => `${a.patientName}: ${a.status}`));
+        
+        setAppointments(transformedAppointments);
+      } else {
+        setError(result.message || 'Failed to load appointments');
+      }
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+      setError('An error occurred while loading appointments');
+    } finally {
+      setIsLoadingAppointments(false);
     }
-  ];
+  };
 
+  // Fetch appointments when component mounts or user changes
+  useEffect(() => {
+    fetchAppointments();
+  }, [user, isLoaded]);
+
+  // Listen for appointment update events (for real-time UI updates)
+  useEffect(() => {
+    const handleAppointmentUpdate = (e) => {
+      console.log('🔔 Received appointmentUpdated event in DoctorDashboard:', e.detail);
+      // The state should already be updated by optimistic update, but this ensures consistency
+    };
+
+    window.addEventListener('appointmentUpdated', handleAppointmentUpdate);
+    return () => window.removeEventListener('appointmentUpdated', handleAppointmentUpdate);
+  }, []);
+
+  // Handle appointment status update
+  const handleStatusUpdate = async (appointmentId, newStatus) => {
+    console.log('🖱️ Button clicked! handleStatusUpdate triggered');
+    console.log(`🔄 Updating appointment ${appointmentId} to status: ${newStatus}`);
+    console.log(`📊 Current appointments count BEFORE update: ${appointments.length}`);
+    console.log('🎯 Appointment ID type:', typeof appointmentId, 'Value:', appointmentId);
+    console.log('🎯 New status type:', typeof newStatus, 'Value:', newStatus);
+    
+    try {
+      console.log('⏳ Calling updateAppointmentStatus API...');
+      const result = await updateAppointmentStatus(appointmentId, newStatus);
+      
+      console.log('✅ Update result:', result);
+      console.log('✅ Updated appointment from API:', result.appointment);
+      
+      if (result.success) {
+        console.log('🔄 Update successful! Updating local state...');
+        
+        // APPROACH 1: Optimistic UI update - Update the appointment in local state immediately
+        setAppointments(prevAppointments => {
+          console.log('� Updating appointments in state...');
+          const updated = prevAppointments.map(apt => 
+            apt.id === appointmentId 
+              ? { ...apt, status: newStatus, priority: newStatus === 'confirmed' ? 'high' : apt.priority }
+              : apt
+          );
+          console.log('✅ Local state updated:', updated.find(a => a.id === appointmentId));
+          return updated;
+        });
+        
+        // APPROACH 2: Refetch from server for consistency
+        console.log('🔄 Fetching appointments from server to ensure consistency...');
+        await fetchAppointments();
+        console.log(`📊 Appointments refetched, count: ${appointments.length}`);
+        
+        // Notify other tabs (user dashboards) about this update so they can refresh too
+        try {
+          localStorage.setItem('appointment_update', JSON.stringify({ id: appointmentId, status: newStatus, ts: Date.now() }));
+          // Also dispatch a custom event for same-tab updates
+          window.dispatchEvent(new CustomEvent('appointmentUpdated', { 
+            detail: { id: appointmentId, status: newStatus } 
+          }));
+        } catch (e) {
+          console.warn('Could not write to localStorage:', e);
+        }
+
+        // If API returned affected cancelled appointments, inform the doctor
+        if (result.affected && result.affected.cancelled && result.affected.cancelled.length > 0) {
+          const cancelledCount = result.affected.cancelled.length;
+          const emails = result.affected.cancelled.map(a => a.patientEmail).filter(Boolean);
+          alert(`Appointment ${newStatus === 'confirmed' ? 'confirmed' : newStatus === 'completed' ? 'completed' : 'updated'} successfully!\nNote: ${cancelledCount} other pending appointment(s) for the same slot were cancelled.` + (emails.length ? `\nCancelled patients: ${emails.join(', ')}` : ''));
+        } else {
+          alert(`Appointment ${newStatus === 'confirmed' ? 'confirmed' : newStatus === 'completed' ? 'completed' : 'updated'} successfully! Patient will be notified.`);
+        }
+      } else {
+        console.error('❌ Update failed:', result.message);
+        alert(result.message || 'Failed to update appointment status');
+      }
+    } catch (err) {
+      console.error('❌ Error updating appointment status:', err);
+      alert('An error occurred while updating the appointment');
+    }
+  };
+
+  // Handle appointment cancellation/deletion
+  const handleCancelAppointment = async (appointmentId) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+
+    try {
+      const result = await cancelAppointment(appointmentId, 'Cancelled by doctor');
+      
+      if (result.success) {
+        // Remove the appointment from the local state
+        setAppointments(prevAppointments =>
+          prevAppointments.filter(apt => apt.id !== appointmentId)
+        );
+        alert('Appointment cancelled successfully');
+      } else {
+        alert(result.message || 'Failed to cancel appointment');
+      }
+    } catch (err) {
+      console.error('Error cancelling appointment:', err);
+      alert('An error occurred while cancelling the appointment');
+    }
+  };
+
+  // Mock data for other sections (keep existing)
   const patients = [
     {
       id: 'P001',
@@ -254,7 +369,18 @@ const DoctorDashboard = ({ user }) => {
 
   const handleAppointmentAction = (appointmentId, action) => {
     console.log(`Action: ${action} for appointment ${appointmentId}`);
-    closeModal();
+    
+    if (action === 'confirm') {
+      handleStatusUpdate(appointmentId, 'confirmed');
+    } else if (action === 'complete') {
+      handleStatusUpdate(appointmentId, 'completed');
+    } else if (action === 'reschedule') {
+      // TODO: Implement reschedule functionality
+      alert('Reschedule functionality coming soon!');
+      closeModal();
+    } else {
+      closeModal();
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -446,7 +572,41 @@ const DoctorDashboard = ({ user }) => {
       </div>
 
       {/* Appointments Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {isLoadingAppointments ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <p className="text-gray-600">Loading appointments...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <div className="text-red-500 mb-4">
+            <FaExclamationCircle className="text-5xl mx-auto mb-3" />
+            <p className="text-lg font-semibold">Error Loading Appointments</p>
+            <p className="text-sm mt-2">{error}</p>
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="btn-primary mt-4"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : appointments.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+          <FaCalendarAlt className="text-5xl mx-auto mb-4 text-gray-300" />
+          <p className="text-lg mb-2">No appointments found</p>
+          <p className="text-sm">You don't have any appointments yet</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* Results count */}
+        {(filterStatus !== 'all' || filterDate !== 'all' || searchQuery) && (
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <p className="text-sm text-gray-600">
+              Showing <span className="font-semibold text-gray-900">{filteredAppointments.length}</span> of <span className="font-semibold text-gray-900">{appointments.length}</span> appointments
+            </p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -460,7 +620,16 @@ const DoctorDashboard = ({ user }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {appointments.map(appointment => (
+              {filteredAppointments.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center">
+                    <FaFilter className="text-5xl mx-auto mb-4 text-gray-300" />
+                    <p className="text-gray-500 text-lg mb-2">No appointments match your filters</p>
+                    <p className="text-gray-400 text-sm">Try adjusting your search or filter criteria</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredAppointments.map(appointment => (
                 <tr key={appointment.id} className="hover:bg-gray-50">
                   <td className="table-cell">
                     <div className="patient-info">
@@ -492,6 +661,24 @@ const DoctorDashboard = ({ user }) => {
                   </td>
                   <td className="table-cell">
                     <div className="action-buttons">
+                      {appointment.status === 'pending' && (
+                        <button 
+                          onClick={() => handleStatusUpdate(appointment.id, 'confirmed')}
+                          className="btn-icon btn-success btn-sm"
+                          title="Confirm Appointment"
+                        >
+                          <FaCheckCircle />
+                        </button>
+                      )}
+                      {appointment.status === 'confirmed' && (
+                        <button 
+                          onClick={() => handleStatusUpdate(appointment.id, 'completed')}
+                          className="btn-icon btn-primary btn-sm"
+                          title="Mark as Completed"
+                        >
+                          <FaCheckCircle />
+                        </button>
+                      )}
                       <button 
                         onClick={() => openModal('appointment', appointment)}
                         className="btn-icon btn-primary btn-sm"
@@ -507,20 +694,22 @@ const DoctorDashboard = ({ user }) => {
                         <FaEdit />
                       </button>
                       <button 
-                        onClick={() => openModal('delete-appointment', appointment)}
+                        onClick={() => handleCancelAppointment(appointment.id)}
                         className="btn-icon btn-danger btn-sm"
-                        title="Delete"
+                        title="Cancel Appointment"
                       >
                         <FaTrash />
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              )}
             </tbody>
           </table>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1073,6 +1262,53 @@ const DoctorDashboard = ({ user }) => {
       </div>
     );
   };
+
+  // Filter appointments based on search, status, and date filters
+  const getFilteredAppointments = () => {
+    let filtered = [...appointments];
+    
+    // Search filter (by patient name)
+    if (searchQuery) {
+      filtered = filtered.filter(apt => 
+        apt.patientName.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    // Status filter
+    if (filterStatus && filterStatus !== 'all') {
+      filtered = filtered.filter(apt => apt.status === filterStatus);
+    }
+    
+    // Date filter
+    if (filterDate && filterDate !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      
+      filtered = filtered.filter(apt => {
+        const aptDate = new Date(apt.date);
+        aptDate.setHours(0, 0, 0, 0);
+        
+        if (filterDate === 'today') {
+          return aptDate.getTime() === today.getTime();
+        } else if (filterDate === 'tomorrow') {
+          return aptDate.getTime() === tomorrow.getTime();
+        } else if (filterDate === 'week') {
+          return aptDate >= today && aptDate <= nextWeek;
+        }
+        return true;
+      });
+    }
+    
+    return filtered;
+  };
+
+  const filteredAppointments = getFilteredAppointments();
 
   return (
     <div className="doctor-dashboard">

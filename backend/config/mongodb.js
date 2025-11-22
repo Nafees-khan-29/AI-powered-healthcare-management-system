@@ -4,7 +4,7 @@ const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
     
-    console.log('Attempting to connect to MongoDB...');
+   
     
     // Try with minimal options first
     await mongoose.connect(mongoURI, {

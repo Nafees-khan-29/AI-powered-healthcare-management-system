@@ -65,13 +65,13 @@ const Dashboard = () => {
   const renderDashboard = () => {
     switch (userRole) {
       case 'user':
-        return <UserDashboard user={user} />;
+        return <UserDashboard />;
       case 'doctor':
-        return <DoctorDashboard user={user} />;
+        return <DoctorDashboard />;
       case 'admin':
         return <AdminDashboard user={user} />;
       default:
-        return <UserDashboard user={user} />;
+        return <UserDashboard />;
     }
   };
 

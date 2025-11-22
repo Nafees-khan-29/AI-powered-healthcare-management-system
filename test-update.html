@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Appointment Status Update</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #output {
+            background: #fff;
+            padding: 15px;
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Appointment Status Update API</h1>
+    
+    <div class="test-section">
+        <h3>Test Status Update</h3>
+        <p>Enter appointment ID and click "Confirm" to test the update endpoint</p>
+        
+        <div>
+            <label>Appointment ID:</label><br>
+            <input type="text" id="appointmentId" value="691071c2018de6e1caf031fd" style="width: 300px;">
+        </div>
+        
+        <div>
+            <label>New Status:</label><br>
+            <select id="status">
+                <option value="pending">Pending</option>
+                <option value="confirmed" selected>Confirmed</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+        </div>
+        
+        <button onclick="testUpdate()">Update Status</button>
+        <button onclick="fetchAppointment()" style="background: #2196F3;">Fetch Appointment</button>
+    </div>
+    
+    <div id="output">Click "Update Status" to test...</div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        async function testUpdate() {
+            const appointmentId = document.getElementById('appointmentId').value;
+            const status = document.getElementById('status').value;
+            const output = document.getElementById('output');
+            
+            output.textContent = 'Sending request...\n';
+            
+            try {
+                const url = `${API_BASE_URL}/appointments/${appointmentId}/status`;
+                output.textContent += `URL: ${url}\n`;
+                output.textContent += `Method: PUT\n`;
+                output.textContent += `Body: ${JSON.stringify({ status })}\n\n`;
+                
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+                
+                output.textContent += `Response Status: ${response.status} ${response.statusText}\n\n`;
+                
+                const data = await response.json();
+                output.textContent += 'Response Data:\n';
+                output.textContent += JSON.stringify(data, null, 2);
+                
+                if (response.ok) {
+                    output.textContent += '\n\n✅ SUCCESS!';
+                } else {
+                    output.textContent += '\n\n❌ ERROR!';
+                }
+            } catch (error) {
+                output.textContent += `\n\n❌ ERROR: ${error.message}`;
+                console.error(error);
+            }
+        }
+
+        async function fetchAppointment() {
+            const appointmentId = document.getElementById('appointmentId').value;
+            const output = document.getElementById('output');
+            
+            output.textContent = 'Fetching appointment...\n';
+            
+            try {
+                const url = `${API_BASE_URL}/appointments/doctor/michael.chen@healthcare.com`;
+                output.textContent += `URL: ${url}\n\n`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                output.textContent += 'Response:\n';
+                output.textContent += JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent += `\n\n❌ ERROR: ${error.message}`;
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

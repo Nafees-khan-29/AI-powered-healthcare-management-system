@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Doctor Cache</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        .success {
+            background: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+        .info {
+            background: #f0f9ff;
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .steps {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .steps li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Clear Doctor Cache</h1>
+        
+        <div class="info">
+            <strong>Why do I need this?</strong>
+            <p>The selected doctor was saved before we added email fields. This prevents appointments from being linked to doctors correctly.</p>
+        </div>
+
+        <div id="currentData" style="margin: 20px 0; padding: 15px; background: #f3f4f6; border-radius: 5px;">
+            <strong>Current Selected Doctor:</strong>
+            <pre id="doctorData" style="margin: 10px 0; padding: 10px; background: white; border-radius: 3px; overflow-x: auto;"></pre>
+        </div>
+
+        <button onclick="clearCache()">🗑️ Clear Doctor Cache</button>
+        <button onclick="clearAll()">🔥 Clear All LocalStorage</button>
+        <button onclick="location.href='/'">🏠 Go to Home</button>
+
+        <div id="success" class="success">
+            ✅ Cache cleared successfully!
+        </div>
+
+        <div class="steps">
+            <strong>📋 Next Steps:</strong>
+            <ol>
+                <li>Click the "Clear Doctor Cache" button above</li>
+                <li>Go to the <strong>Doctors</strong> page</li>
+                <li>Select <strong>Dr. Michael Chen</strong> (or any doctor) again</li>
+                <li>Create a <strong>new appointment</strong></li>
+                <li>The appointment will now include the doctor's email</li>
+                <li>Login as that doctor to see and confirm appointments!</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Display current doctor data
+        function displayCurrentData() {
+            const doctor = localStorage.getItem('selectedDoctor');
+            const dataEl = document.getElementById('doctorData');
+            
+            if (doctor) {
+                try {
+                    const parsed = JSON.parse(doctor);
+                    dataEl.textContent = JSON.stringify(parsed, null, 2);
+                    
+                    // Highlight if email is missing
+                    if (!parsed.email) {
+                        dataEl.style.borderLeft = '4px solid #ef4444';
+                        dataEl.innerHTML += '\n\n❌ MISSING EMAIL FIELD!';
+                    }
+                } catch (e) {
+                    dataEl.textContent = doctor;
+                }
+            } else {
+                dataEl.textContent = 'No doctor selected';
+                dataEl.style.color = '#999';
+            }
+        }
+
+        function clearCache() {
+            const doctor = localStorage.getItem('selectedDoctor');
+            if (doctor) {
+                localStorage.removeItem('selectedDoctor');
+                console.log('✅ Cleared selected doctor from localStorage');
+                document.getElementById('success').style.display = 'block';
+                setTimeout(() => {
+                    displayCurrentData();
+                    document.getElementById('success').style.display = 'none';
+                }, 3000);
+            } else {
+                alert('ℹ️ No doctor data to clear');
+            }
+        }
+
+        function clearAll() {
+            if (confirm('⚠️ This will log you out of Clerk. Continue?')) {
+                localStorage.clear();
+                console.log('✅ Cleared all localStorage');
+                document.getElementById('success').style.display = 'block';
+                setTimeout(() => {
+                    displayCurrentData();
+                    location.href = '/';
+                }, 2000);
+            }
+        }
+
+        // Display on load
+        displayCurrentData();
+    </script>
+</body>
+</html>

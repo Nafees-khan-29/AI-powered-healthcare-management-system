@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
+import { getUserAppointments, cancelAppointment } from '../../../services/appointmentService';
 import { 
   FaCalendarAlt, 
   FaUser, 
@@ -21,6 +23,7 @@ import {
   FaEnvelope,
   FaStar,
   FaCheckCircle,
+  FaExclamationCircle,
   FaExclamationTriangle,
   FaTimes,
   FaArrowRight,
@@ -28,51 +31,113 @@ import {
 } from 'react-icons/fa';
 import './UserDashboard.css';
 
-const UserDashboard = ({ user }) => {
+const UserDashboard = () => {
   const navigate = useNavigate();
+  const { user, isLoaded } = useUser();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data for demonstration
-  const [appointments, setAppointments] = useState([
-    { 
-      id: 1, 
-      doctor: 'Dr. Sarah Johnson', 
-      specialty: 'Cardiology', 
-      date: '2024-08-18', 
-      time: '10:00 AM', 
-      status: 'confirmed', 
-      type: 'consultation',
-      location: 'City Hospital, Room 205',
-      notes: 'Follow-up appointment for heart condition'
-    },
-    { 
-      id: 2, 
-      doctor: 'Dr. Robert Chen', 
-      specialty: 'Neurology', 
-      date: '2024-08-25', 
-      time: '02:30 PM', 
-      status: 'pending', 
-      type: 'follow-up',
-      location: 'Downtown Medical Center, Room 112',
-      notes: 'Neurological examination'
-    },
-    { 
-      id: 3, 
-      doctor: 'Dr. Maria Garcia', 
-      specialty: 'Pediatrics', 
-      date: '2024-08-20', 
-      time: '09:00 AM', 
-      status: 'cancelled', 
-      type: 'consultation',
-      location: 'City Hospital, Room 301',
-      notes: 'Annual checkup'
+  // Fetch user's appointments
+  useEffect(() => {
+    fetchAppointments();
+  }, [user, isLoaded]);
+
+  // Listen for appointment updates from other tabs (doctor confirmations)
+  useEffect(() => {
+    const storageHandler = (e) => {
+      if (!e) return;
+      if (e.key === 'appointment_update') {
+        try {
+          const payload = JSON.parse(e.newValue);
+          console.log('🛰️ Received appointment_update via storage:', payload);
+          // Refresh user's appointments to reflect status change
+          fetchAppointments();
+        } catch (err) {
+          console.warn('Could not parse appointment_update payload', err);
+        }
+      }
+    };
+
+    // Also listen for same-tab custom events
+    const customEventHandler = (e) => {
+      console.log('🔔 Received appointmentUpdated event:', e.detail);
+      fetchAppointments();
+    };
+
+    window.addEventListener('storage', storageHandler);
+    window.addEventListener('appointmentUpdated', customEventHandler);
+    
+    return () => {
+      window.removeEventListener('storage', storageHandler);
+      window.removeEventListener('appointmentUpdated', customEventHandler);
+    };
+  }, [user, isLoaded]);
+
+  // Function to fetch appointments (can be called manually)
+  const fetchAppointments = async () => {
+    if (!isLoaded || !user) return;
+    
+    setIsLoadingAppointments(true);
+    setError(null);
+    
+    try {
+      console.log('📥 Fetching appointments for user:', user.id);
+      const result = await getUserAppointments(user.id);
+      console.log('✅ Appointments fetched:', result);
+      
+      // Transform appointments to match component format and filter out cancelled ones
+      const transformedAppointments = result.appointments
+        .filter(apt => apt.status !== 'cancelled') // Don't show cancelled appointments
+        .map(apt => ({
+          id: apt._id,
+          doctor: apt.doctorName,
+          specialty: apt.doctorSpecialization,
+          date: apt.appointmentDate,
+          time: apt.appointmentTime,
+          status: apt.status,
+          type: 'consultation',
+          location: 'City Hospital',
+          notes: apt.symptoms,
+          patientName: apt.patientName,
+          patientEmail: apt.patientEmail,
+          patientPhone: apt.patientPhone,
+          additionalNotes: apt.additionalNotes,
+          medicalReports: apt.medicalReports || []
+        }));
+      
+      setAppointments(transformedAppointments);
+    } catch (error) {
+      console.error('❌ Error fetching appointments:', error);
+      setError(error.message);
+    } finally {
+      setIsLoadingAppointments(false);
     }
-  ]);
+  };
 
+  // Handle appointment cancellation
+  const handleCancelAppointment = async (appointmentId) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) {
+      return;
+    }
+    
+    try {
+      await cancelAppointment(appointmentId, 'Patient requested cancellation');
+      // Refresh appointments
+      await fetchAppointments();
+      alert('Appointment cancelled successfully!');
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      alert('Failed to cancel appointment: ' + error.message);
+    }
+  };
+
+  // Mock data for medical records (keep for now)
   const [medicalRecords, setMedicalRecords] = useState([
     { 
       id: 1, 
@@ -232,7 +297,17 @@ const UserDashboard = ({ user }) => {
       {/* Next Appointment */}
       <div className="dashboard-card p-6">
         <h3 className="text-lg font-semibold mb-4">Next Appointment</h3>
-        {appointments.find(apt => apt.status === 'confirmed') ? (
+        {isLoadingAppointments ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+            <p className="text-gray-500 text-sm">Loading...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-red-500">
+            <FaExclamationCircle className="text-3xl mx-auto mb-2" />
+            <p className="text-sm">Unable to load appointments</p>
+          </div>
+        ) : appointments.find(apt => apt.status === 'confirmed') ? (
           <div className="bg-blue-50 rounded-xl p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -319,8 +394,41 @@ const UserDashboard = ({ user }) => {
 
       {/* Appointments List */}
       <div className="space-y-4">
-        {appointments.map((appointment) => (
-          <div key={appointment.id} className="dashboard-card p-6">
+        {isLoadingAppointments ? (
+          <div className="dashboard-card p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading appointments...</p>
+          </div>
+        ) : error ? (
+          <div className="dashboard-card p-12 text-center">
+            <div className="text-red-500 mb-4">
+              <FaExclamationCircle className="text-5xl mx-auto mb-3" />
+              <p className="text-lg font-semibold">Error Loading Appointments</p>
+              <p className="text-sm mt-2">{error}</p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="btn-primary mt-4"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : appointments.length === 0 ? (
+          <div className="dashboard-card p-12 text-center text-gray-500">
+            <FaCalendarAlt className="text-5xl mx-auto mb-4 text-gray-300" />
+            <p className="text-lg mb-2">No appointments found</p>
+            <p className="text-sm mb-4">Book your first appointment to get started</p>
+            <button 
+              onClick={() => navigate('/appointment')}
+              className="btn-primary"
+            >
+              <FaPlus className="inline mr-2" />
+              Book Appointment
+            </button>
+          </div>
+        ) : (
+          appointments.map((appointment) => (
+            <div key={appointment.id} className="dashboard-card p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-start gap-4">
@@ -365,21 +473,23 @@ const UserDashboard = ({ user }) => {
                     <FaEye />
                   </button>
                   
-                  {appointment.status === 'confirmed' && (
+                  {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
                     <>
+                      {appointment.status === 'confirmed' && (
+                        <button 
+                          onClick={() => handleAppointmentAction('reschedule', appointment)}
+                          className="action-btn edit"
+                          title="Reschedule"
+                        >
+                          <FaEdit />
+                        </button>
+                      )}
                       <button 
-                        onClick={() => handleAppointmentAction('reschedule', appointment)}
-                        className="action-btn edit"
-                        title="Reschedule"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button 
-                        onClick={() => handleAppointmentAction('cancel', appointment)}
+                        onClick={() => handleCancelAppointment(appointment.id)}
                         className="action-btn delete"
-                        title="Cancel"
+                        title="Cancel Appointment"
                       >
-                        <FaTimes />
+                        <FaTrash />
                       </button>
                     </>
                   )}
@@ -387,7 +497,8 @@ const UserDashboard = ({ user }) => {
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
