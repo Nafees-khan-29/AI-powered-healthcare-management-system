@@ -1,14 +1,14 @@
 /* Doctor Dashboard Styles */
 .doctor-dashboard {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: white;
   padding: 2rem;
 }
 
 /* Tab Styles */
 .tab-content {
   background: white;
-  border-radius: 16px;
+  /* border-radius: 16px; */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   padding: 2rem;
   min-height: 500px;
@@ -32,8 +32,8 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #2563eb;
+  /* box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); */
   transform: translateY(-2px);
 }
 
@@ -48,7 +48,7 @@
 
 /* Button Styles */
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #54a6f4 0%, #2563eb 100%);
   color: white;
   padding: 0.75rem 1.5rem;
   border-radius: 12px;
@@ -63,12 +63,12 @@
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
 }
 
 .btn-secondary {
   background: white;
-  color: #374151;
+  /* color: #374151; */
   padding: 0.75rem 1.5rem;
   border-radius: 12px;
   font-weight: 600;
@@ -103,7 +103,7 @@
 
 /* Stat Card Styles */
 .stat-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #54a6f4 0%, #2563eb 100%);
   color: white;
   border-radius: 16px;
   padding: 1.5rem;
@@ -119,7 +119,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  /* background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%); */
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -130,23 +130,23 @@
 
 .stat-card:hover {
   transform: scale(1.05);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  /* box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.3); */
 }
 
 .stat-card.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #54a6f4 0%, #2563eb 100%);
 }
 
 .stat-card.success {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
 .stat-card.warning {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
 }
 
 .stat-card.info {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
 }
 
 /* Status Badge Styles */
@@ -287,8 +287,8 @@
 
 .form-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   transform: translateY(-1px);
 }
 
@@ -316,13 +316,13 @@
 
 .filter-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 /* Welcome Section Styles */
 .welcome-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #54a6f4 0%, #2563eb 100%);
   color: white;
   border-radius: 16px;
   padding: 2rem;
@@ -337,7 +337,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  /* background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%); */
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -412,7 +412,7 @@
 }
 
 .stat-change.positive {
-  background-color: rgba(34, 197, 94, 0.2);
+  /* background-color: rgba(34, 197, 94, 0.2); */
   color: #16a34a;
 }
 
@@ -422,7 +422,7 @@
 }
 
 .stat-change.neutral {
-  background-color: rgba(107, 114, 128, 0.2);
+  /* background-color: rgba(107, 114, 128, 0.2); */
   color: #6b7280;
 }
 
@@ -628,7 +628,7 @@
   margin-bottom: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-  border-left: 4px solid #8b5cf6;
+  border-left: 4px solid #2563eb;
 }
 
 .medical-record-card-large:hover {
@@ -843,11 +843,41 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
+.modal-container-large {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 800px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideInUp 0.3s ease;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
 .modal-title {
   font-size: 1.5rem;
   font-weight: 600;
   color: #111827;
   margin-bottom: 1.5rem;
+}
+
+.modal-header {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.form-section {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.section-title {
+  color: #111827;
+  margin-bottom: 1rem;
 }
 
 .info-group {
@@ -893,7 +923,7 @@
   margin-bottom: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-  border-left: 4px solid #10b981;
+  border-left: 4px solid #2563eb;
 }
 
 .patient-card:hover {
@@ -909,7 +939,7 @@
   margin-bottom: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-  border-left: 4px solid #8b5cf6;
+  border-left: 4px solid #2563eb;
 }
 
 .medical-record-card:hover {
@@ -925,7 +955,7 @@
   margin-bottom: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-  border-left: 4px solid #f59e0b;
+  border-left: 4px solid #2563eb;
 }
 
 .prescription-card:hover {
@@ -946,23 +976,23 @@
 }
 
 .icon-circle.blue {
-  background-color: #dbeafe;
-  color: #1d4ed8;
+  /* background-color: rgba(37, 99, 235, 0.1); */
+  color: #2563eb;
 }
 
 .icon-circle.green {
-  background-color: #d1fae5;
-  color: #065f46;
+  /* background-color: rgba(16, 185, 129, 0.1); */
+  color: #10b981;
 }
 
 .icon-circle.purple {
-  background-color: #e9d5ff;
-  color: #7c3aed;
+  /* background-color: rgba(139, 92, 246, 0.1); */
+  color: #8b5cf6;
 }
 
 .icon-circle.orange {
-  background-color: #fed7aa;
-  color: #ea580c;
+  /* background-color: rgba(245, 158, 11, 0.1); */
+  color: #f59e0b;
 }
 
 /* Animations */
@@ -1016,7 +1046,7 @@
   width: 1.5rem;
   height: 1.5rem;
   border: 2px solid #e5e7eb;
-  border-top: 2px solid #3b82f6;
+  border-top: 2px solid #2563eb;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   display: inline-block;
@@ -1102,17 +1132,17 @@
 
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
-  .doctor-dashboard {
+  /* .doctor-dashboard {
     background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
   }
-  
+   */
   .tab-content,
   .dashboard-card,
   .modal-content,
   .patient-card,
   .medical-record-card,
   .prescription-card {
-    background: #374151;
+    
     color: #f9fafb;
   }
   
@@ -1143,7 +1173,7 @@
 
 /* Focus Indicators */
 .focus-visible:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
 

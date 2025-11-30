@@ -180,11 +180,11 @@ const createAppointment = async (req, res) => {
             }));
         }
 
-        // Prevent double-booking: check for existing appointment (pending OR confirmed) for same doctor/date/time
+        // Prevent double-booking: check for existing booked OR pending appointment for same doctor/date/time
         const conflictQuery = { 
             appointmentDate: sanitizedData.appointmentDate, 
             appointmentTime: sanitizedData.appointmentTime, 
-            status: { $in: ['pending', 'confirmed'] } // Check both pending and confirmed
+            status: { $in: ['booked', 'pending'] } // Check both booked and pending appointments
         };
         if (doctorEmail) {
             conflictQuery.doctorEmail = doctorEmail.toLowerCase();
@@ -204,7 +204,7 @@ const createAppointment = async (req, res) => {
             });
             return res.status(409).json({
                 success: false,
-                message: `This time slot is already taken for ${finalDoctorName}. Please choose another time.`
+                message: `This time slot is already ${existingAppointment.status === 'booked' ? 'booked' : 'pending approval'} for ${finalDoctorName}. Please choose another time.`
             });
         }
 
@@ -376,7 +376,7 @@ const updateAppointmentStatus = async (req, res) => {
         console.log('📦 Request body:', req.body);
         console.log('📦 Request params:', req.params);
 
-        const validStatuses = ['pending', 'confirmed', 'completed', 'cancelled', 'rescheduled'];
+        const validStatuses = ['pending', 'booked', 'completed', 'cancelled', 'rescheduled'];
         
         if (!validStatuses.includes(status)) {
             return res.status(400).json({
@@ -392,8 +392,8 @@ const updateAppointmentStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Appointment not found' });
         }
 
-        // If confirming, ensure there is no other confirmed appointment for same doctor/date/time
-        if (status === 'confirmed') {
+        // If booking, ensure there is no other booked appointment for same doctor/date/time
+        if (status === 'booked') {
             const match = {};
             if (current.doctorEmail) match.doctorEmail = current.doctorEmail;
             else if (current.doctorId) match.doctorId = current.doctorId;
@@ -403,13 +403,13 @@ const updateAppointmentStatus = async (req, res) => {
                 ...match,
                 appointmentDate: current.appointmentDate,
                 appointmentTime: current.appointmentTime,
-                status: 'confirmed',
+                status: 'booked',
                 _id: { $ne: current._id }
             });
 
             if (conflict) {
-                console.warn('⚠️ Cannot confirm: slot already confirmed by another appointment', conflict._id);
-                return res.status(409).json({ success: false, message: 'This time slot has already been confirmed for the doctor.' });
+                console.warn('⚠️ Cannot book: slot already booked by another appointment', conflict._id);
+                return res.status(409).json({ success: false, message: 'This time slot has already been booked for the doctor.' });
             }
         }
 
@@ -427,9 +427,9 @@ const updateAppointmentStatus = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Appointment not found' });
         }
 
-        // If we've just confirmed this appointment, cancel other pending appointments for same slot
+        // If we've just booked this appointment, cancel other pending appointments for same slot
         let affected = { cancelled: [] };
-        if (status === 'confirmed') {
+        if (status === 'booked') {
             const match = {};
             if (appointment.doctorEmail) match.doctorEmail = appointment.doctorEmail;
             else if (appointment.doctorId) match.doctorId = appointment.doctorId;
@@ -514,6 +514,96 @@ const cancelAppointment = async (req, res) => {
     }
 };
 
+// Update appointment details (reschedule)
+const updateAppointment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+
+        console.log(`🔄 Updating appointment ${id} with data:`, updateData);
+
+        // Validate required fields if provided
+        const allowedFields = [
+            'appointmentDate', 'appointmentTime', 'symptoms', 'additionalNotes',
+            'emergencyContact', 'insuranceProvider', 'previousConditions'
+        ];
+
+        const filteredData = {};
+        Object.keys(updateData).forEach(key => {
+            if (allowedFields.includes(key)) {
+                filteredData[key] = updateData[key];
+            }
+        });
+
+        // If updating date/time, check for conflicts
+        if (filteredData.appointmentDate || filteredData.appointmentTime) {
+            const currentAppointment = await appointmentModel.findById(id);
+            if (!currentAppointment) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Appointment not found'
+                });
+            }
+
+            const newDate = filteredData.appointmentDate || currentAppointment.appointmentDate;
+            const newTime = filteredData.appointmentTime || currentAppointment.appointmentTime;
+
+            // Check for conflicts with the same doctor
+            const conflictQuery = {
+                appointmentDate: newDate,
+                appointmentTime: newTime,
+                status: { $in: ['booked', 'pending'] }, // Check both booked and pending appointments
+                _id: { $ne: id }
+            };
+
+            if (currentAppointment.doctorEmail) {
+                conflictQuery.doctorEmail = currentAppointment.doctorEmail;
+            } else if (currentAppointment.doctorId) {
+                conflictQuery.doctorId = currentAppointment.doctorId;
+            } else {
+                conflictQuery.doctorName = currentAppointment.doctorName;
+            }
+
+            const existingAppointment = await appointmentModel.findOne(conflictQuery);
+            if (existingAppointment) {
+                return res.status(409).json({
+                    success: false,
+                    message: `This time slot is already ${existingAppointment.status === 'booked' ? 'booked' : 'pending approval'}. Please choose another time.`
+                });
+            }
+        }
+
+        // Update the appointment
+        const appointment = await appointmentModel.findByIdAndUpdate(
+            id,
+            filteredData,
+            { new: true }
+        );
+
+        if (!appointment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Appointment not found'
+            });
+        }
+
+        console.log(`✅ Appointment ${id} updated successfully`);
+
+        res.status(200).json({
+            success: true,
+            message: 'Appointment updated successfully',
+            appointment
+        });
+    } catch (error) {
+        console.error('Error updating appointment:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating appointment',
+            error: error.message
+        });
+    }
+};
+
 // Get all appointments (admin)
 const getAllAppointments = async (req, res) => {
     try {
@@ -551,6 +641,7 @@ export {
     getDoctorAppointments,
     updateAppointmentStatus,
     cancelAppointment,
+    updateAppointment,
     getAllAppointments,
     getBookedSlots
 };
@@ -569,11 +660,12 @@ const getBookedSlots = async (req, res) => {
 
         console.log(`🔍 Fetching booked slots for ${doctorEmail} on ${date}`);
 
-        // Find all pending and confirmed appointments for this doctor on this date
+        // Find all booked AND pending appointments for this doctor on this date
+        // Pending appointments should also block slots until confirmed or cancelled
         const query = {
             doctorEmail: doctorEmail.toLowerCase(),
             appointmentDate: date,
-            status: { $in: ['pending', 'confirmed'] }
+            status: { $in: ['booked', 'pending'] } // Include both booked and pending
         };
         
         console.log('🔎 getBookedSlots query:', JSON.stringify(query));
@@ -584,7 +676,7 @@ const getBookedSlots = async (req, res) => {
         
         const bookedSlots = bookedAppointments.map(apt => apt.appointmentTime);
 
-        console.log(`✅ Found ${bookedSlots.length} booked slots (pending + confirmed):`, bookedSlots);
+        console.log(`✅ Found ${bookedSlots.length} booked/pending slots:`, bookedSlots);
 
         res.status(200).json({
             success: true,

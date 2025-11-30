@@ -6,6 +6,7 @@ import {
     getDoctorAppointments,
     updateAppointmentStatus,
     cancelAppointment,
+    updateAppointment,
     getAllAppointments,
     getBookedSlots
 } from '../controllers/appointmentController.js';
@@ -29,6 +30,9 @@ appointmentRouter.get('/', getAllAppointments);
 
 // PUT /api/appointments/:id/status - Update appointment status
 appointmentRouter.put('/:id/status', updateAppointmentStatus);
+
+// PUT /api/appointments/:id - Update appointment details
+appointmentRouter.put('/:id', updateAppointment);
 
 // DELETE /api/appointments/:id - Cancel appointment
 appointmentRouter.delete('/:id', cancelAppointment);

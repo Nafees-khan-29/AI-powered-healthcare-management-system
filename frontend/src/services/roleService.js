@@ -114,7 +114,7 @@ export const getStoredUserData = () => {
  */
 export const getDashboardPath = (role) => {
   const paths = {
-    admin: 'userDash',
+    admin: '/dashboard/admin',
     doctor: '/dashboard/doctor',
     user: '/dashboard/user',
   };
