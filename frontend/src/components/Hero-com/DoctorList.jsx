@@ -1,35 +1,52 @@
+import doc1 from '../../assets/assets_frontend/doc1.png';
+import doc2 from '../../assets/assets_frontend/doc2.png';
+import doc4 from '../../assets/assets_frontend/doc4.png';
+import doc5 from '../../assets/assets_frontend/doc5.png';
+import doc6 from '../../assets/assets_frontend/doc6.png';
+// import doc7 from '../../assets/assets_frontend/doc7.png';
+import doc8 from '../../assets/assets_frontend/doc8.png';
+import doc9 from '../../assets/assets_frontend/doc9.png';
+import doc10 from '../../assets/assets_frontend/doc10.png';
+import doc11 from '../../assets/assets_frontend/doc11.png';
+import doc12 from '../../assets/assets_frontend/doc12.png';
+import doc13 from '../../assets/assets_frontend/doc13.png';
+import doc14 from '../../assets/assets_frontend/doc14.png';
+import doc15 from '../../assets/assets_frontend/doc15.png'
+import doc16 from '../../assets/assets_frontend/doc16.jpg';
+import doc17 from '../../assets/assets_frontend/doc17.jpg';
+
 export const doctorsData = {
   Cardiology: [
     {
-      name: 'Dr. Sarah Mitchell',
+      name: 'Dr. Michael Chen',
       specialization: 'Cardiology',
-      image: '/images/doc1.jpg',
-      experience: '8+ years',
+      image: doc1,
+      experience: '15+ years',
       availability: 'Mon - Fri',
       education: 'MD - Cardiology',
-      phone: '+1-555-0101',
-      email: 'sarah.mitchell@healthcare.com',
-      hospital: 'Mount Sinai Hospital'
+      phone: '+1-555-0102',
+      email: 'michael.chen@healthcare.com',
+      hospital: 'Massachusetts General Hospital'
     }
   ],
   Neurology: [
     {
-      name: 'Dr. Michael Chen',
+      name: 'Dr. Sarah Johnson',
       specialization: 'Neurology',
-      image: '/images/doc2.jpg',
-      experience: '10+ years',
+      image: doc2,
+      experience: '8+ years',
       availability: 'Mon - Fri',
       education: 'MD - Neurology',
-      phone: '+1-555-0102',
-      email: 'michael.chen@healthcare.com',
-      hospital: 'Massachusetts General Hospital'
+      phone: '+1-555-0101',
+      email: 'sarah.johnson@healthcare.com',
+      hospital: 'Mount Sinai Hospital'
     }
   ],
   Pediatrics: [
     {
       name: 'Dr. Emily Rodriguez',
       specialization: 'Pediatrics',
-      image: '/images/doc3.jpg',
+      image: doc9,
       experience: '6+ years',
       availability: 'Mon - Sat',
       education: 'MD - Pediatrics',
@@ -42,7 +59,7 @@ export const doctorsData = {
     {
       name: 'Dr. James Anderson',
       specialization: 'Orthopedics',
-      image: '/images/doc4.jpg',
+      image: doc4,
       experience: '12+ years',
       availability: 'Mon - Fri',
       education: 'MD - Orthopedics',
@@ -55,7 +72,7 @@ export const doctorsData = {
     {
       name: 'Dr. Priya Patel',
       specialization: 'Dermatology',
-      image: '/images/doc5.jpg',
+      image: doc17,
       experience: '5+ years',
       availability: 'Tue - Sat',
       education: 'MD - Dermatology',
@@ -68,7 +85,7 @@ export const doctorsData = {
     {
       name: 'Dr. Robert Williams',
       specialization: 'Oncology',
-      image: '/images/doc6.jpg',
+      image: doc6,
       experience: '14+ years',
       availability: 'Mon - Fri',
       education: 'MD - Oncology',
@@ -81,7 +98,7 @@ export const doctorsData = {
     {
       name: 'Dr. Lisa Thompson',
       specialization: 'Gynecology',
-      image: '/images/doc7.jpg',
+      image: doc15,
       experience: '9+ years',
       availability: 'Mon - Sat',
       education: 'MD - Gynecology',
@@ -94,7 +111,7 @@ export const doctorsData = {
     {
       name: 'Dr. David Kim',
       specialization: 'Psychiatry',
-      image: '/images/doc8.jpg',
+      image: doc8,
       experience: '7+ years',
       availability: 'Tue - Sat',
       education: 'MD - Psychiatry',
@@ -107,7 +124,7 @@ export const doctorsData = {
     {
       name: 'Dr. Maria Garcia',
       specialization: 'Endocrinology',
-      image: '/images/doc9.jpg',
+      image: doc5,
       experience: '11+ years',
       availability: 'Mon - Fri',
       education: 'MD - Endocrinology',
@@ -120,7 +137,7 @@ export const doctorsData = {
     {
       name: 'Dr. Thomas Brown',
       specialization: 'Gastroenterology',
-      image: '/images/doc10.jpg',
+      image: doc10,
       experience: '13+ years',
       availability: 'Mon - Fri',
       education: 'MD - Gastroenterology',
@@ -133,7 +150,7 @@ export const doctorsData = {
     {
       name: 'Dr. Jennifer Lee',
       specialization: 'Ophthalmology',
-      image: '/images/doc11.jpg',
+      image: doc11,
       experience: '4+ years',
       availability: 'Tue - Sat',
       education: 'MD - Ophthalmology',
@@ -146,7 +163,7 @@ export const doctorsData = {
     {
       name: 'Dr. Ahmed Hassan',
       specialization: 'Pulmonology',
-      image: '/images/doc12.jpg',
+      image: doc12,
       experience: '10+ years',
       availability: 'Mon - Fri',
       education: 'MD - Pulmonology',
@@ -159,7 +176,7 @@ export const doctorsData = {
     {
       name: 'Dr. Rachel Cohen',
       specialization: 'Rheumatology',
-      image: '/images/doc13.jpg',
+      image: doc13,
       experience: '6+ years',
       availability: 'Wed - Sun',
       education: 'MD - Rheumatology',
@@ -172,7 +189,7 @@ export const doctorsData = {
     {
       name: 'Dr. Kevin O\'Brien',
       specialization: 'Urology',
-      image: '/images/doc14.jpg',
+      image: doc14,
       experience: '12+ years',
       availability: 'Mon - Fri',
       education: 'MD - Urology',
@@ -185,7 +202,7 @@ export const doctorsData = {
     {
       name: 'Dr. Aisha Mohammed',
       specialization: 'Radiology',
-      image: '/images/doc15.jpg',
+      image: doc16,
       experience: '3+ years',
       availability: 'Tue - Sat',
       education: 'MD - Radiology',

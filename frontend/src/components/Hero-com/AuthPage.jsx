@@ -29,6 +29,24 @@ const AuthPage = () => {
 
   return (
     <div className="auth-page-wrapper">
+      <div className="mobile-auth-toggle" aria-label="Switch authentication view">
+        <button
+          type="button"
+          className={`mobile-auth-toggle-btn ${!isSignUp ? 'active' : ''}`}
+          onClick={() => setIsSignUp(false)}
+          aria-pressed={!isSignUp}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          className={`mobile-auth-toggle-btn ${isSignUp ? 'active' : ''}`}
+          onClick={() => setIsSignUp(true)}
+          aria-pressed={isSignUp}
+        >
+          Sign Up
+        </button>
+      </div>
       <div className={`auth-container ${isSignUp ? 'right-panel-active' : ''}`}>
         {/* Sign Up Form */}
         <div className="form-container sign-up-container">
@@ -41,10 +59,10 @@ const AuthPage = () => {
                   headerTitle: "hidden",
                   headerSubtitle: "hidden",
                   socialButtonsBlockButton: 
-                    "border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all duration-300 text-sm",
-                  socialButtonsBlockButtonText: "font-medium text-gray-700 text-sm",
+                    "border-2 border-blue-100 bg-white/80 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all duration-300 text-sm",
+                  socialButtonsBlockButtonText: "font-medium text-blue-900 text-sm",
                   formButtonPrimary: 
-                    "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 normal-case text-white font-semibold rounded-lg transition-all duration-300 shadow-md hover:shadow-lg",
+                    "bg-blue-700 hover:bg-blue-900 normal-case text-white font-semibold rounded-lg transition-all duration-300 shadow-lg shadow-blue-500/30",
                   formFieldInput: 
                     "border border-gray-300 focus:border-blue-500 rounded-md px-3 py-2 text-sm",
                   formFieldLabel: "text-gray-700 font-medium text-xs",
@@ -77,10 +95,10 @@ const AuthPage = () => {
                   headerTitle: "hidden",
                   headerSubtitle: "hidden",
                   socialButtonsBlockButton: 
-                    "border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all duration-300 text-sm",
-                  socialButtonsBlockButtonText: "font-medium text-gray-700 text-sm",
+                    "border-2 border-blue-100 bg-white/80 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all duration-300 text-sm",
+                  socialButtonsBlockButtonText: "font-medium text-blue-900 text-sm",
                   formButtonPrimary: 
-                    "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 normal-case text-white font-semibold rounded-lg transition-all duration-300 shadow-md hover:shadow-lg",
+                    "bg-blue-700 hover:bg-blue-900 normal-case text-white font-semibold rounded-lg transition-all duration-300 shadow-lg shadow-blue-500/30",
                   formFieldInput: 
                     "border border-gray-300 focus:border-blue-500 rounded-md px-3 py-2 text-sm",
                   formFieldLabel: "text-gray-700 font-medium text-xs",

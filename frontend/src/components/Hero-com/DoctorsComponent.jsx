@@ -51,12 +51,12 @@ const DoctorsComponent = () => {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}
         <div className={`
-          lg:w-64 bg-white shadow-lg p-6 
-          ${isMenuOpen ? 'block' : 'hidden'} 
-          lg:block fixed lg:sticky top-20 h-[calc(100vh-5rem)]
+          bg-white shadow-lg p-6 rounded-2xl
+          ${isMenuOpen ? 'block' : 'hidden'}
+          lg:block lg:w-64 lg:sticky lg:top-24 lg:h-[calc(100vh-6rem)]
           overflow-y-auto z-10
         `}>
           <h2 className="text-xl font-bold mb-6 text-gray-800">Specializations</h2>
@@ -96,7 +96,7 @@ const DoctorsComponent = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6 lg:pl-8">
+  <div className="flex-1 p-4 sm:p-6 lg:pl-10">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900 mb-4 md:mb-0">
               {selectedCategory === 'All' ? 'All Doctors' : `${selectedCategory} Specialists`}
@@ -111,7 +111,7 @@ const DoctorsComponent = () => {
           </div>
           
           <motion.div 
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
@@ -124,11 +124,13 @@ const DoctorsComponent = () => {
                 transition={{ delay: index * 0.1 }}
                 className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
               >
-                <img
-                  src={doctor.image}
-                  alt={doctor.name}
-                  className="w-full h-48 object-cover"
-                />
+                <div className="w-full h-64 bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={doctor.image}
+                    alt={doctor.name}
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
                     {doctor.name}
@@ -136,7 +138,7 @@ const DoctorsComponent = () => {
                   <p className="text-blue-600 font-medium mb-2">
                     {doctor.specialization}
                   </p>
-                  <div className="space-y-2 text-gray-600 text-sm mb-4">
+                  <div className="space-y-2 text-gray-900 text-sm mb-4">
                     <p>Experience: {doctor.experience}</p>
                     <p>Available: {doctor.availability}</p>
                     <p>Education: {doctor.education}</p>
