@@ -7,6 +7,8 @@ import adminrouter from './routes/adminRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import doctorRouter from './routes/doctorRoutes.js';
 import appointmentRouter from './routes/appointmentRoutes.js';
+import medicalRecordRouter from './routes/medicalRecordRoutes.js';
+import prescriptionRouter from './routes/prescriptionRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -29,6 +31,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminrouter);
 app.use('/api/doctors', doctorRouter);
 app.use('/api/appointments', appointmentRouter);
+app.use('/api/medical-records', medicalRecordRouter);
+app.use('/api/prescriptions', prescriptionRouter);
 
 app.get('/', (req, res) => {
     res.send('API is running - Healthcare Management System');

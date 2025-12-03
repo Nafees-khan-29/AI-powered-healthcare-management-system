@@ -1,8 +1,8 @@
 [
   {
     "id": "admin-001-2023-uuid-1a2b3c4d5e6f",
-    "full_name": "Dr. Jonathan Carter",
-    "email": "admin@healthcare.com",
+    "full_name": "muzammil",
+    "email": "muzammilahmedk3@gmail.com",
     "password": "Admin@123456",
     "role": "Super Admin",
     "department": "Administration",
@@ -45,24 +45,28 @@
     ]
   },
   {
-    "id": "admin-003-2023-uuid-3c4d5e6f7a8b",
-    "full_name": "Mr. Marcus Thompson",
-    "email": "marcus.thompson@healthcare.com",
-    "password": "Marcus@2023",
-    "role": "Admin",
-    "department": "Medical Records",
-    "phone": "+1-555-9997",
-    "employee_id": "ADM-2023-003",
-    "address": "100 Healthcare Admin Plaza, New York, NY 10001",
+    "id": "admin-004-2023-uuid-4d5e6f7a8b9c",
+    "full_name": "Nafees_Khan_29",
+    "email": "nafeeskhan7627@gmail.com",
+    "password": "Admin@123456",
+    "role": "Super Admin",
+    "department": "System Administration",
+    "phone": "+1-555-9996",
+    "employee_id": "ADM-2023-004",
+    "address": "456 Admin Plaza, Tech City, TC 12345",
     "hospital": "Medicare Central Hospital",
-    "dob": "1988-11-10",
+    "dob": "1990-05-15",
     "gender": "Male",
-    "registration_date": "2023-03-20",
+    "registration_date": "2023-12-01",
     "active": true,
     "permissions": [
+      "manage_doctors",
       "manage_patients",
+      "manage_appointments",
       "view_reports",
-      "manage_appointments"
+      "manage_users",
+      "system_settings",
+      "manage_admins"
     ]
   }
 ]

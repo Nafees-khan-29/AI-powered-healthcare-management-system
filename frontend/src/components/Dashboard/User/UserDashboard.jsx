@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
-import { getUserAppointments, cancelAppointment } from '../../../services/appointmentService';
+import { getUserAppointments, updateAppointmentStatus, cancelAppointment, updateAppointment } from '../../../services/appointmentService';
+import { getPatientMedicalRecords, getPatientPrescriptions } from '../../../services/medicalRecordService';
+import Navbar from '../../Hero-com/Navbar';
 import { 
   FaCalendarAlt, 
   FaUser, 
@@ -43,9 +45,31 @@ const UserDashboard = () => {
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(true);
   const [error, setError] = useState(null);
 
+  // Edit appointment state
+  const [isEditingAppointment, setIsEditingAppointment] = useState(false);
+  const [editAppointmentData, setEditAppointmentData] = useState({
+    appointmentDate: '',
+    appointmentTime: '',
+    symptoms: '',
+    additionalNotes: '',
+    emergencyContact: '',
+    insuranceProvider: '',
+    previousConditions: ''
+  });
+
   // Fetch user's appointments
   useEffect(() => {
     fetchAppointments();
+  }, [user, isLoaded]);
+
+  // Fetch medical records
+  useEffect(() => {
+    fetchMedicalRecords();
+  }, [user, isLoaded]);
+
+  // Fetch prescriptions
+  useEffect(() => {
+    fetchPrescriptions();
   }, [user, isLoaded]);
 
   // Listen for appointment updates from other tabs (doctor confirmations)
@@ -76,6 +100,68 @@ const UserDashboard = () => {
     return () => {
       window.removeEventListener('storage', storageHandler);
       window.removeEventListener('appointmentUpdated', customEventHandler);
+    };
+  }, [user, isLoaded]);
+
+  // Listen for medical record updates from doctor dashboard
+  useEffect(() => {
+    const storageHandler = (e) => {
+      if (!e) return;
+      if (e.key === 'medical_record_created') {
+        try {
+          const payload = JSON.parse(e.newValue);
+          console.log('🛰️ Received medical_record_created via storage:', payload);
+          // Refresh medical records to show new record
+          fetchMedicalRecords();
+        } catch (err) {
+          console.warn('Could not parse medical_record_created payload', err);
+        }
+      }
+    };
+
+    // Also listen for same-tab custom events
+    const customEventHandler = (e) => {
+      console.log('🔔 Received medicalRecordCreated event:', e.detail);
+      fetchMedicalRecords();
+    };
+
+    window.addEventListener('storage', storageHandler);
+    window.addEventListener('medicalRecordCreated', customEventHandler);
+    
+    return () => {
+      window.removeEventListener('storage', storageHandler);
+      window.removeEventListener('medicalRecordCreated', customEventHandler);
+    };
+  }, [user, isLoaded]);
+
+  // Listen for prescription updates from doctor dashboard
+  useEffect(() => {
+    const storageHandler = (e) => {
+      if (!e) return;
+      if (e.key === 'prescription_created') {
+        try {
+          const payload = JSON.parse(e.newValue);
+          console.log('🛰️ Received prescription_created via storage:', payload);
+          // Refresh prescriptions to show new prescription
+          fetchPrescriptions();
+        } catch (err) {
+          console.warn('Could not parse prescription_created payload', err);
+        }
+      }
+    };
+
+    // Also listen for same-tab custom events
+    const customEventHandler = (e) => {
+      console.log('🔔 Received prescriptionCreated event:', e.detail);
+      fetchPrescriptions();
+    };
+
+    window.addEventListener('storage', storageHandler);
+    window.addEventListener('prescriptionCreated', customEventHandler);
+    
+    return () => {
+      window.removeEventListener('storage', storageHandler);
+      window.removeEventListener('prescriptionCreated', customEventHandler);
     };
   }, [user, isLoaded]);
 
@@ -128,6 +214,23 @@ const UserDashboard = () => {
     
     try {
       await cancelAppointment(appointmentId, 'Patient requested cancellation');
+      
+      // Notify doctor dashboard about the cancellation
+      try {
+        localStorage.setItem('appointment_update', JSON.stringify({ 
+          id: appointmentId, 
+          status: 'cancelled',
+          ts: Date.now(),
+          cancelledBy: 'patient'
+        }));
+        // Also dispatch a custom event for same-tab updates
+        window.dispatchEvent(new CustomEvent('appointmentUpdated', { 
+          detail: { id: appointmentId, status: 'cancelled', cancelledBy: 'patient' } 
+        }));
+      } catch (e) {
+        console.warn('Could not write to localStorage:', e);
+      }
+      
       // Refresh appointments
       await fetchAppointments();
       alert('Appointment cancelled successfully!');
@@ -137,59 +240,162 @@ const UserDashboard = () => {
     }
   };
 
-  // Mock data for medical records (keep for now)
-  const [medicalRecords, setMedicalRecords] = useState([
-    { 
-      id: 1, 
-      type: 'Blood Test', 
-      date: '2024-07-15', 
-      doctor: 'Dr. Sarah Johnson', 
-      status: 'completed', 
-      results: 'Normal',
-      file: 'blood_test_july_2024.pdf'
-    },
-    { 
-      id: 2, 
-      type: 'X-Ray', 
-      date: '2024-06-20', 
-      doctor: 'Dr. Robert Chen', 
-      status: 'completed', 
-      results: 'Clear',
-      file: 'chest_xray_june_2024.pdf'
-    },
-    { 
-      id: 3, 
-      type: 'ECG', 
-      date: '2024-08-10', 
-      doctor: 'Dr. Sarah Johnson', 
-      status: 'pending', 
-      results: 'Awaiting results',
-      file: null
-    }
-  ]);
+  // Handle view appointment details
+  const handleViewAppointment = (appointment) => {
+    openModal('viewAppointment', appointment);
+  };
 
-  const [prescriptions, setPrescriptions] = useState([
-    { 
-      id: 1, 
-      medication: 'Aspirin 100mg', 
-      dosage: '1 tablet daily', 
-      duration: '30 days', 
-      prescribedBy: 'Dr. Sarah Johnson', 
-      date: '2024-08-01', 
-      status: 'active',
-      refills: 2
-    },
-    { 
-      id: 2, 
-      medication: 'Metformin 500mg', 
-      dosage: '1 tablet twice daily', 
-      duration: '90 days', 
-      prescribedBy: 'Dr. Robert Chen', 
-      date: '2024-07-15', 
-      status: 'active',
-      refills: 1
+  // Handle edit appointment
+  const handleEditAppointment = (appointment) => {
+    setEditAppointmentData({
+      appointmentDate: appointment.date,
+      appointmentTime: appointment.time,
+      symptoms: appointment.notes || '',
+      additionalNotes: appointment.additionalNotes || '',
+      emergencyContact: appointment.emergencyContact || '',
+      insuranceProvider: appointment.insuranceProvider || '',
+      previousConditions: appointment.previousConditions || ''
+    });
+    setIsEditingAppointment(true);
+    openModal('editAppointment', appointment);
+  };
+
+  // Handle delete appointment (same as cancel)
+  const handleDeleteAppointment = (appointmentId) => {
+    handleCancelAppointment(appointmentId);
+  };
+
+  // Handle save edited appointment
+  const handleSaveEditedAppointment = async () => {
+    try {
+      const updateData = {
+        appointmentDate: editAppointmentData.appointmentDate,
+        appointmentTime: editAppointmentData.appointmentTime,
+        symptoms: editAppointmentData.symptoms,
+        additionalNotes: editAppointmentData.additionalNotes,
+        emergencyContact: editAppointmentData.emergencyContact,
+        insuranceProvider: editAppointmentData.insuranceProvider,
+        previousConditions: editAppointmentData.previousConditions
+      };
+
+      await updateAppointment(selectedItem.id, updateData);
+      
+      // Notify doctor dashboard about the appointment update
+      try {
+        localStorage.setItem('appointment_update', JSON.stringify({ 
+          id: selectedItem.id, 
+          status: selectedItem.status, // Keep the same status
+          updated: true,
+          ts: Date.now(),
+          updatedBy: 'patient'
+        }));
+        // Also dispatch a custom event for same-tab updates
+        window.dispatchEvent(new CustomEvent('appointmentUpdated', { 
+          detail: { 
+            id: selectedItem.id, 
+            status: selectedItem.status, 
+            updated: true,
+            updatedBy: 'patient' 
+          } 
+        }));
+      } catch (e) {
+        console.warn('Could not write to localStorage:', e);
+      }
+      
+      // Refresh appointments
+      await fetchAppointments();
+      setIsEditingAppointment(false);
+      closeModal();
+      alert('Appointment updated successfully!');
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      alert('Failed to update appointment: ' + error.message);
     }
-  ]);
+  };
+
+  // Fetch medical records
+  const fetchMedicalRecords = async () => {
+    if (!isLoaded || !user) return;
+    
+    setIsLoadingMedicalRecords(true);
+    try {
+      console.log('📥 Fetching medical records for user:', user.primaryEmailAddress?.emailAddress);
+      const response = await getPatientMedicalRecords(user.primaryEmailAddress?.emailAddress);
+      console.log('✅ Medical records response:', response);
+      
+      // Handle API response format
+      const records = response.medicalRecords || response || [];
+      
+      // Transform records to match component format
+      const transformedRecords = records.map(record => ({
+        id: record._id,
+        type: record.diagnosis || record.testType || record.type || 'Medical Report',
+        date: new Date(record.createdAt || record.date).toLocaleDateString(),
+        doctor: record.doctorName || record.doctor || 'Unknown Doctor',
+        status: record.status || 'completed',
+        results: record.diagnosis || record.results || record.findings || 'Results pending',
+        file: record.fileUrl || null,
+        // Additional fields for detailed view
+        symptoms: record.symptoms,
+        treatment: record.treatment,
+        notes: record.notes,
+        followUp: record.followUp,
+        prescriptions: record.prescriptions || []
+      }));
+      
+      setMedicalRecords(transformedRecords);
+    } catch (error) {
+      console.error('❌ Error fetching medical records:', error);
+      setMedicalRecords([]);
+    } finally {
+      setIsLoadingMedicalRecords(false);
+    }
+  };
+
+  // Fetch prescriptions
+  const fetchPrescriptions = async () => {
+    if (!isLoaded || !user) return;
+    
+    setIsLoadingPrescriptions(true);
+    try {
+      console.log('📥 Fetching prescriptions for user:', user.primaryEmailAddress?.emailAddress);
+      const response = await getPatientPrescriptions(user.primaryEmailAddress?.emailAddress);
+      console.log('✅ Prescriptions response:', response);
+      
+      // Handle API response format
+      const presc = response.prescriptions || response || [];
+      
+      // Transform prescriptions to match component format
+      const transformedPrescriptions = presc.map(prescription => ({
+        id: prescription._id,
+        medication: prescription.medication,
+        dosage: prescription.dosage,
+        duration: prescription.duration,
+        prescribedBy: prescription.doctorName || prescription.doctor || 'Unknown Doctor',
+        date: new Date(prescription.createdAt || prescription.date).toLocaleDateString(),
+        status: prescription.status || 'active',
+        refills: prescription.refills || 0,
+        instructions: prescription.instructions,
+        pharmacy: prescription.pharmacy,
+        medicalRecordId: prescription.medicalRecordId
+      }));
+      
+      setPrescriptions(transformedPrescriptions);
+    } catch (error) {
+      console.error('❌ Error fetching prescriptions:', error);
+      setPrescriptions([]);
+    } finally {
+      setIsLoadingPrescriptions(false);
+    }
+  };
+
+  // Medical records state
+  const [medicalRecords, setMedicalRecords] = useState([]);
+  const [isLoadingMedicalRecords, setIsLoadingMedicalRecords] = useState(false);
+
+  // Prescriptions state
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
 
   const [healthMetrics, setHealthMetrics] = useState({
     bloodPressure: '120/80',
@@ -222,6 +428,16 @@ const UserDashboard = () => {
     setShowModal(false);
     setModalType('');
     setSelectedItem(null);
+    setIsEditingAppointment(false);
+    setEditAppointmentData({
+      appointmentDate: '',
+      appointmentTime: '',
+      symptoms: '',
+      additionalNotes: '',
+      emergencyContact: '',
+      insuranceProvider: '',
+      previousConditions: ''
+    });
   };
 
   const handleAppointmentAction = (action, appointment) => {
@@ -466,7 +682,7 @@ const UserDashboard = () => {
                 
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => openModal('viewAppointment', appointment)}
+                    onClick={() => handleViewAppointment(appointment)}
                     className="action-btn view"
                     title="View Details"
                   >
@@ -475,17 +691,15 @@ const UserDashboard = () => {
                   
                   {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
                     <>
-                      {appointment.status === 'confirmed' && (
-                        <button 
-                          onClick={() => handleAppointmentAction('reschedule', appointment)}
-                          className="action-btn edit"
-                          title="Reschedule"
-                        >
-                          <FaEdit />
-                        </button>
-                      )}
                       <button 
-                        onClick={() => handleCancelAppointment(appointment.id)}
+                        onClick={() => handleEditAppointment(appointment)}
+                        className="action-btn edit"
+                        title="Edit Appointment"
+                      >
+                        <FaEdit />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteAppointment(appointment.id)}
                         className="action-btn delete"
                         title="Cancel Appointment"
                       >
@@ -527,51 +741,64 @@ const UserDashboard = () => {
 
       {/* Medical Records List */}
       <div className="space-y-4">
-        {medicalRecords.map((record) => (
-          <div key={record.id} className="dashboard-card p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <FaFileMedical className="text-green-600 text-xl" />
+        {isLoadingMedicalRecords ? (
+          <div className="dashboard-card p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading medical records...</p>
+          </div>
+        ) : medicalRecords.length === 0 ? (
+          <div className="dashboard-card p-12 text-center text-gray-500">
+            <FaFileMedical className="text-5xl mx-auto mb-4 text-gray-300" />
+            <p className="text-lg mb-2">No medical records found</p>
+            <p className="text-sm">Your medical records will appear here when created by your doctor</p>
+          </div>
+        ) : (
+          medicalRecords.map((record) => (
+            <div key={record.id} className="dashboard-card p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <FaFileMedical className="text-green-600 text-xl" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-lg">{record.type}</h4>
+                    <p className="text-gray-600">Dr. {record.doctor}</p>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                      <span>{record.date}</span>
+                      <span>Results: {record.results}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-lg">{record.type}</h4>
-                  <p className="text-gray-600">Dr. {record.doctor}</p>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>{record.date}</span>
-                    <span>Results: {record.results}</span>
+                
+                <div className="flex flex-col items-end gap-3">
+                  <span className={`status-badge ${record.status}`}>
+                    {record.status}
+                  </span>
+                  
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => openModal('viewRecord', record)}
+                      className="action-btn view"
+                      title="View Details"
+                    >
+                      <FaEye />
+                    </button>
+                    
+                    {record.file && (
+                      <button 
+                        onClick={() => openModal('downloadRecord', record)}
+                        className="action-btn edit"
+                        title="Download"
+                      >
+                        <FaDownload />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
-              
-              <div className="flex flex-col items-end gap-3">
-                <span className={`status-badge ${record.status}`}>
-                  {record.status}
-                </span>
-                
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => openModal('viewRecord', record)}
-                    className="action-btn view"
-                    title="View Details"
-                  >
-                    <FaEye />
-                  </button>
-                  
-                  {record.file && (
-                    <button 
-                      onClick={() => openModal('downloadRecord', record)}
-                      className="action-btn edit"
-                      title="Download"
-                    >
-                      <FaDownload />
-                    </button>
-                  )}
-                </div>
-              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -599,53 +826,66 @@ const UserDashboard = () => {
 
       {/* Prescriptions List */}
       <div className="space-y-4">
-        {prescriptions.map((prescription) => (
-          <div key={prescription.id} className="dashboard-card p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <FaPills className="text-purple-600 text-xl" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-lg">{prescription.medication}</h4>
-                  <p className="text-gray-600">Dr. {prescription.prescribedBy}</p>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>Dosage: {prescription.dosage}</span>
-                    <span>Duration: {prescription.duration}</span>
-                    <span>Refills: {prescription.refills}</span>
+        {isLoadingPrescriptions ? (
+          <div className="dashboard-card p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading prescriptions...</p>
+          </div>
+        ) : prescriptions.length === 0 ? (
+          <div className="dashboard-card p-12 text-center text-gray-500">
+            <FaPills className="text-5xl mx-auto mb-4 text-gray-300" />
+            <p className="text-lg mb-2">No prescriptions found</p>
+            <p className="text-sm">Your prescriptions will appear here when prescribed by your doctor</p>
+          </div>
+        ) : (
+          prescriptions.map((prescription) => (
+            <div key={prescription.id} className="dashboard-card p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                    <FaPills className="text-purple-600 text-xl" />
                   </div>
-                  <p className="text-gray-600 mt-2 text-sm">Prescribed on {prescription.date}</p>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-lg">{prescription.medication}</h4>
+                    <p className="text-gray-600">Dr. {prescription.prescribedBy}</p>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                      <span>Dosage: {prescription.dosage}</span>
+                      <span>Duration: {prescription.duration}</span>
+                      <span>Refills: {prescription.refills}</span>
+                    </div>
+                    <p className="text-gray-600 mt-2 text-sm">Prescribed on {prescription.date}</p>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex flex-col items-end gap-3">
-                <span className={`status-badge ${prescription.status}`}>
-                  {prescription.status}
-                </span>
                 
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => openModal('viewPrescription', prescription)}
-                    className="action-btn view"
-                    title="View Details"
-                  >
-                    <FaEye />
-                  </button>
+                <div className="flex flex-col items-end gap-3">
+                  <span className={`status-badge ${prescription.status}`}>
+                    {prescription.status}
+                  </span>
                   
-                  {prescription.status === 'active' && prescription.refills > 0 && (
+                  <div className="flex gap-2">
                     <button 
-                      onClick={() => openModal('requestRefill', prescription)}
-                      className="action-btn edit"
-                      title="Request Refill"
+                      onClick={() => openModal('viewPrescription', prescription)}
+                      className="action-btn view"
+                      title="View Details"
                     >
-                      <FaEdit />
+                      <FaEye />
                     </button>
-                  )}
+                    
+                    {prescription.status === 'active' && prescription.refills > 0 && (
+                      <button 
+                        onClick={() => openModal('requestRefill', prescription)}
+                        className="action-btn edit"
+                        title="Request Refill"
+                      >
+                        <FaEdit />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -735,6 +975,564 @@ const UserDashboard = () => {
 
     const renderModalContent = () => {
       switch (modalType) {
+        case 'viewAppointment':
+          return (
+            <div className="modal-content max-w-4xl">
+              <h2 className="modal-title flex items-center gap-2">
+                <FaCalendarAlt className="text-blue-600" />
+                Appointment Details
+              </h2>
+              
+              <div className="space-y-6">
+                {/* Header Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="info-group">
+                    <label className="info-label">Doctor</label>
+                    <p className="info-value font-semibold text-blue-700">{selectedItem.doctor}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Specialization</label>
+                    <p className="info-value">{selectedItem.specialty}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Date</label>
+                    <p className="info-value">{selectedItem.date}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Time</label>
+                    <p className="info-value">{selectedItem.time}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Status</label>
+                    <span className={`status-badge ${selectedItem.status}`}>
+                      {selectedItem.status}
+                    </span>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Location</label>
+                    <p className="info-value">{selectedItem.location}</p>
+                  </div>
+                </div>
+
+                {/* Patient Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Patient Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                    <div className="info-group">
+                      <label className="info-label">Name</label>
+                      <p className="info-value">{selectedItem.patientName}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Email</label>
+                      <p className="info-value">{selectedItem.patientEmail}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Phone</label>
+                      <p className="info-value">{selectedItem.patientPhone}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Age</label>
+                      <p className="info-value">{selectedItem.patientAge || 'Not specified'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Appointment Details */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Appointment Details</h3>
+                  
+                  {selectedItem.notes && (
+                    <div className="info-group">
+                      <label className="info-label">Symptoms/Reason</label>
+                      <div className="info-value bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-500">
+                        <p className="text-gray-800">{selectedItem.notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.additionalNotes && (
+                    <div className="info-group">
+                      <label className="info-label">Additional Notes</label>
+                      <div className="info-value bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+                        <p className="text-gray-800">{selectedItem.additionalNotes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.emergencyContact && (
+                    <div className="info-group">
+                      <label className="info-label">Emergency Contact</label>
+                      <div className="info-value bg-red-50 p-3 rounded-lg border-l-4 border-red-500">
+                        <p className="text-gray-800">{selectedItem.emergencyContact}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.insuranceProvider && (
+                    <div className="info-group">
+                      <label className="info-label">Insurance Provider</label>
+                      <div className="info-value bg-green-50 p-3 rounded-lg border-l-4 border-green-500">
+                        <p className="text-gray-800">{selectedItem.insuranceProvider}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.previousConditions && (
+                    <div className="info-group">
+                      <label className="info-label">Previous Conditions</label>
+                      <div className="info-value bg-orange-50 p-3 rounded-lg border-l-4 border-orange-500">
+                        <p className="text-gray-800">{selectedItem.previousConditions}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Medical Reports if available */}
+                {selectedItem.medicalReports && selectedItem.medicalReports.length > 0 && (
+                  <div className="info-group">
+                    <label className="info-label">Attached Medical Reports</label>
+                    <div className="space-y-2">
+                      {selectedItem.medicalReports.map((report, index) => (
+                        <div key={index} className="bg-gray-50 p-3 rounded-lg border">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-gray-900">{report.filename}</p>
+                              <p className="text-sm text-gray-600">
+                                {(report.size / 1024).toFixed(2)} KB • {report.mimetype}
+                              </p>
+                            </div>
+                            <button className="btn-primary text-sm">
+                              <FaDownload className="mr-1" />
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button onClick={closeModal} className="btn-secondary">
+                  Close
+                </button>
+                {(selectedItem.status === 'pending' || selectedItem.status === 'confirmed') && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        closeModal();
+                        handleEditAppointment(selectedItem);
+                      }}
+                      className="btn-primary"
+                    >
+                      <FaEdit className="mr-2" />
+                      Edit Appointment
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+
+        case 'editAppointment':
+          return (
+            <div className="modal-content max-w-2xl">
+              <h2 className="modal-title flex items-center gap-2">
+                <FaEdit className="text-blue-600" />
+                Edit Appointment
+              </h2>
+              
+              <div className="space-y-6">
+                {/* Doctor Information (Read-only) */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Doctor Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="info-group">
+                      <label className="info-label">Doctor</label>
+                      <p className="info-value font-semibold">{selectedItem.doctor}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Specialization</label>
+                      <p className="info-value">{selectedItem.specialty}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Editable Fields */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Appointment Details</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="form-group">
+                      <label className="form-label">Date *</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={editAppointmentData.appointmentDate}
+                        onChange={(e) => setEditAppointmentData({
+                          ...editAppointmentData,
+                          appointmentDate: e.target.value
+                        })}
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Time *</label>
+                      <select
+                        className="form-input"
+                        value={editAppointmentData.appointmentTime}
+                        onChange={(e) => setEditAppointmentData({
+                          ...editAppointmentData,
+                          appointmentTime: e.target.value
+                        })}
+                      >
+                        <option value="">Select time</option>
+                        <option value="09:00">09:00 AM</option>
+                        <option value="09:30">09:30 AM</option>
+                        <option value="10:00">10:00 AM</option>
+                        <option value="10:30">10:30 AM</option>
+                        <option value="11:00">11:00 AM</option>
+                        <option value="11:30">11:30 AM</option>
+                        <option value="14:00">02:00 PM</option>
+                        <option value="14:30">02:30 PM</option>
+                        <option value="15:00">03:00 PM</option>
+                        <option value="15:30">03:30 PM</option>
+                        <option value="16:00">04:00 PM</option>
+                        <option value="16:30">04:30 PM</option>
+                        <option value="17:00">05:00 PM</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Symptoms/Reason for Visit</label>
+                    <textarea
+                      className="form-input"
+                      rows="3"
+                      placeholder="Describe your symptoms or reason for the appointment..."
+                      value={editAppointmentData.symptoms}
+                      onChange={(e) => setEditAppointmentData({
+                        ...editAppointmentData,
+                        symptoms: e.target.value
+                      })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Additional Notes</label>
+                    <textarea
+                      className="form-input"
+                      rows="2"
+                      placeholder="Any additional information..."
+                      value={editAppointmentData.additionalNotes}
+                      onChange={(e) => setEditAppointmentData({
+                        ...editAppointmentData,
+                        additionalNotes: e.target.value
+                      })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="form-group">
+                      <label className="form-label">Emergency Contact</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Name and phone number"
+                        value={editAppointmentData.emergencyContact}
+                        onChange={(e) => setEditAppointmentData({
+                          ...editAppointmentData,
+                          emergencyContact: e.target.value
+                        })}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Insurance Provider</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Insurance company name"
+                        value={editAppointmentData.insuranceProvider}
+                        onChange={(e) => setEditAppointmentData({
+                          ...editAppointmentData,
+                          insuranceProvider: e.target.value
+                        })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Previous Medical Conditions</label>
+                    <textarea
+                      className="form-input"
+                      rows="2"
+                      placeholder="List any relevant previous conditions..."
+                      value={editAppointmentData.previousConditions}
+                      onChange={(e) => setEditAppointmentData({
+                        ...editAppointmentData,
+                        previousConditions: e.target.value
+                      })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button onClick={closeModal} className="btn-secondary">
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSaveEditedAppointment}
+                  className="btn-primary"
+                  disabled={!editAppointmentData.appointmentDate || !editAppointmentData.appointmentTime}
+                >
+                  <FaSave className="mr-2" />
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          );
+        case 'viewRecord':
+          return (
+            <div className="modal-content max-w-4xl">
+              <h2 className="modal-title flex items-center gap-2">
+                <FaFileMedical className="text-green-600" />
+                Medical Report Details
+              </h2>
+              
+              <div className="space-y-6">
+                {/* Header Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="info-group">
+                    <label className="info-label">Report Type</label>
+                    <p className="info-value font-semibold text-green-700">{selectedItem.type}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Date</label>
+                    <p className="info-value">{selectedItem.date}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Doctor</label>
+                    <p className="info-value">Dr. {selectedItem.doctor}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Status</label>
+                    <span className={`status-badge ${selectedItem.status}`}>
+                      {selectedItem.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Medical Information */}
+                <div className="space-y-4">
+                  <div className="info-group">
+                    <label className="info-label">Diagnosis</label>
+                    <div className="info-value bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
+                      <p className="text-gray-800 font-medium">{selectedItem.results}</p>
+                    </div>
+                  </div>
+
+                  {/* Additional Details if available */}
+                  {selectedItem.symptoms && (
+                    <div className="info-group">
+                      <label className="info-label">Symptoms</label>
+                      <div className="info-value bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-500">
+                        <p className="text-gray-800">{selectedItem.symptoms}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.treatment && (
+                    <div className="info-group">
+                      <label className="info-label">Treatment</label>
+                      <div className="info-value bg-green-50 p-3 rounded-lg border-l-4 border-green-500">
+                        <p className="text-gray-800">{selectedItem.treatment}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.notes && (
+                    <div className="info-group">
+                      <label className="info-label">Additional Notes</label>
+                      <div className="info-value bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+                        <p className="text-gray-800">{selectedItem.notes}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedItem.followUp && (
+                    <div className="info-group">
+                      <label className="info-label">Follow-up Date</label>
+                      <div className="info-value bg-orange-50 p-3 rounded-lg border-l-4 border-orange-500">
+                        <p className="text-gray-800 font-medium">{selectedItem.followUp}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Associated Prescriptions if available */}
+                {selectedItem.prescriptions && selectedItem.prescriptions.length > 0 && (
+                  <div className="info-group">
+                    <label className="info-label">Prescribed Medications</label>
+                    <div className="space-y-3">
+                      {selectedItem.prescriptions.map((prescription, index) => (
+                        <div key={index} className="bg-gray-50 p-4 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{prescription.medication}</h4>
+                              <p className="text-sm text-gray-600">Dosage: {prescription.dosage}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Duration: {prescription.duration}</p>
+                              <p className="text-sm text-gray-600">Refills: {prescription.refills}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* File Download if available */}
+                {selectedItem.file && (
+                  <div className="info-group">
+                    <label className="info-label">Attached Files</label>
+                    <div className="flex items-center gap-3">
+                      <button className="btn-primary flex items-center gap-2">
+                        <FaDownload />
+                        Download Report
+                      </button>
+                      <span className="text-sm text-gray-500">PDF file available</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button onClick={closeModal} className="btn-secondary">
+                  Close
+                </button>
+                {selectedItem.file && (
+                  <button className="btn-primary">
+                    <FaDownload className="mr-2" />
+                    Download PDF
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+
+        case 'viewPrescription':
+          return (
+            <div className="modal-content max-w-2xl">
+              <h2 className="modal-title flex items-center gap-2">
+                <FaPills className="text-purple-600" />
+                Prescription Details
+              </h2>
+              
+              <div className="space-y-6">
+                {/* Header Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="info-group">
+                    <label className="info-label">Medication</label>
+                    <p className="info-value font-semibold text-purple-700">{selectedItem.medication}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Prescribed Date</label>
+                    <p className="info-value">{selectedItem.date}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Prescribing Doctor</label>
+                    <p className="info-value">Dr. {selectedItem.prescribedBy}</p>
+                  </div>
+                  <div className="info-group">
+                    <label className="info-label">Status</label>
+                    <span className={`status-badge ${selectedItem.status}`}>
+                      {selectedItem.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Prescription Details */}
+                <div className="space-y-4">
+                  <div className="info-group">
+                    <label className="info-label">Dosage Instructions</label>
+                    <div className="info-value bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
+                      <p className="text-gray-800 font-medium">{selectedItem.dosage}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="info-group">
+                      <label className="info-label">Duration</label>
+                      <div className="info-value bg-green-50 p-3 rounded-lg border-l-4 border-green-500">
+                        <p className="text-gray-800">{selectedItem.duration}</p>
+                      </div>
+                    </div>
+
+                    <div className="info-group">
+                      <label className="info-label">Refills Remaining</label>
+                      <div className="info-value bg-orange-50 p-3 rounded-lg border-l-4 border-orange-500">
+                        <p className="text-gray-800 font-medium">{selectedItem.refills}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Instructions if available */}
+                  {selectedItem.instructions && (
+                    <div className="info-group">
+                      <label className="info-label">Special Instructions</label>
+                      <div className="info-value bg-yellow-50 p-3 rounded-lg border-l-4 border-yellow-500">
+                        <p className="text-gray-800">{selectedItem.instructions}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pharmacy if available */}
+                  {selectedItem.pharmacy && (
+                    <div className="info-group">
+                      <label className="info-label">Pharmacy</label>
+                      <div className="info-value bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+                        <p className="text-gray-800">{selectedItem.pharmacy}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Medical Record Reference if available */}
+                {selectedItem.medicalRecordId && (
+                  <div className="info-group">
+                    <label className="info-label">Related Medical Report</label>
+                    <div className="info-value bg-gray-50 p-3 rounded-lg">
+                      <p className="text-gray-600 text-sm">This prescription is part of a medical report</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button onClick={closeModal} className="btn-secondary">
+                  Close
+                </button>
+                {selectedItem.status === 'active' && selectedItem.refills > 0 && (
+                  <button 
+                    onClick={() => {
+                      closeModal();
+                      openModal('requestRefill', selectedItem);
+                    }} 
+                    className="btn-primary"
+                  >
+                    <FaEdit className="mr-2" />
+                    Request Refill
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+
         case 'bookAppointment':
           return (
             <div>
@@ -810,7 +1608,7 @@ const UserDashboard = () => {
 
     return (
       <div className="modal-overlay" onClick={closeModal}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-container" onClick={e => e.stopPropagation()}>
           {renderModalContent()}
         </div>
       </div>
@@ -818,12 +1616,18 @@ const UserDashboard = () => {
   };
 
   return (
-    <div className="user-dashboard">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Patient Dashboard</h1>
-        <p className="text-gray-600">Manage your health and appointments</p>
-      </div>
+    <>
+      {/* Navbar - positioned outside dashboard container */}
+      <Navbar />
+      
+      <div className="user-dashboard">
+        {/* Add top padding to account for fixed navbar */}
+        <div className="pt-20">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Patient Dashboard</h1>
+          <p className="text-gray-600">Manage your health and appointments</p>
+        </div>
 
       {/* Tabs */}
       <div className="mb-6">
@@ -858,7 +1662,9 @@ const UserDashboard = () => {
 
       {/* Modal */}
       {renderModal()}
-    </div>
+        </div>
+      </div>
+    </>
   );
 };
 

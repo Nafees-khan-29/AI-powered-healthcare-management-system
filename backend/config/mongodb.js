@@ -4,9 +4,6 @@ const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
     
-   
-    
-    // Try with minimal options first
     await mongoose.connect(mongoURI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
@@ -15,8 +12,6 @@ const connectDB = async () => {
     console.log('MongoDB Connected Successfully');
   } catch (error) {
     console.error('MongoDB Connection Error:', error.message);
-    
-    // If SSL fails, try without SSL (not recommended for production)
     try {
       console.log('Retrying without SSL...');
       const uriWithoutSSL = mongoURI.replace('mongodb+srv://', 'mongodb://');

@@ -147,6 +147,30 @@ export const cancelAppointment = async (appointmentId, cancellationReason) => {
     }
 };
 
+// Update appointment details
+export const updateAppointment = async (appointmentId, updateData) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updateData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to update appointment');
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error updating appointment:', error);
+        throw error;
+    }
+};
+
 // Get all appointments (admin)
 export const getAllAppointments = async (filters = {}) => {
     try {
