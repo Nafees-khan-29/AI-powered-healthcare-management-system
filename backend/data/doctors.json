@@ -223,5 +223,21 @@
     "gender": "Female",
     "registration_date": "2023-04-25",
     "active": true
+  },
+
+   {
+    "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+    "full_name": "Dr. Muzammil Khan",
+    "email": "muzammilahmedk3@healthcare.com",
+    "password": "Muzammil@4444",
+    "specialization": "heart Surgeon",
+    "license_number": "MD-2017-44455",
+    "phone": "+1-555-0114",
+    "address": "777 Kidney Care Way, Portland, OR 97201",
+    "hospital": "Oregon Health & Science University",
+    "dob": "1982-07-19",
+    "gender": "Male",
+    "registration_date": "2023-02-08",
+    "active": true
   }
 ]
