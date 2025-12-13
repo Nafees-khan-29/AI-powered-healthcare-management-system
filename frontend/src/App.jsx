@@ -13,6 +13,8 @@ import Home from './pages/Home'
 import DoctorDashboard from './components/Dashboard/Doctor/DoctorDashboard'
 import AdminDashboard from './components/Dashboard/Admin/AdminDashboard'
 import UserDashboard from './components/Dashboard/User/UserDashboard'
+import VideoCallPage from './pages/VideoCallPage'
+import ScrollToTop from './components/ScrollToTop'
 
 
 
@@ -21,6 +23,7 @@ function App() {
  
   return (
     <>
+    <ScrollToTop />
     <Routes>
       <Route path="/" element={<Home/>}/>
       <Route path="/login" element={<Login/>}/>
@@ -32,6 +35,9 @@ function App() {
       <Route path="/login" element={<Login/>}/>
       <Route path='/doctors' element={<DoctorsList/>}/>
       <Route path='/dashboard'element={<Dashboard/>}/>
+      
+      {/* Video Call Route */}
+      <Route path='/video-call' element={<VideoCallPage/>}/>
       
       {/* Role-based dashboard routes */}
       <Route path='/dashboard/user'element={<UserDashboard/>}/>

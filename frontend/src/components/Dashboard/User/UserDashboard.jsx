@@ -458,9 +458,9 @@ const UserDashboard = () => {
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl p-6 text-white shadow-lg">
         <h2 className="text-2xl font-bold mb-2">Welcome back, {user?.name || 'Patient'}!</h2>
-        <p className="text-blue-100">Here's your health summary for today</p>
+        <p className="text-white/90">Here's your health summary for today</p>
       </div>
 
       {/* Quick Stats */}
@@ -468,44 +468,44 @@ const UserDashboard = () => {
         <div className="stat-card primary">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100">Upcoming</p>
+              <p className="text-sm font-medium opacity-90">Upcoming</p>
               <p className="text-3xl font-bold">
                 {appointments.filter(apt => apt.status === 'confirmed' || apt.status === 'pending').length}
               </p>
             </div>
-            <FaCalendarAlt className="text-4xl text-blue-200" />
+            <FaCalendarAlt className="text-4xl opacity-80" />
           </div>
         </div>
         
         <div className="stat-card success">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100">Active Rx</p>
+              <p className="text-sm font-medium opacity-90">Active Rx</p>
               <p className="text-3xl font-bold">
                 {prescriptions.filter(rx => rx.status === 'active').length}
               </p>
             </div>
-            <FaPills className="text-4xl text-green-200" />
+            <FaPills className="text-4xl opacity-80" />
           </div>
         </div>
         
         <div className="stat-card warning">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-orange-100">Records</p>
+              <p className="text-sm font-medium opacity-90">Records</p>
               <p className="text-3xl font-bold">{medicalRecords.length}</p>
             </div>
-            <FaFileMedical className="text-4xl text-orange-200" />
+            <FaFileMedical className="text-4xl opacity-80" />
           </div>
         </div>
         
         <div className="stat-card info">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-cyan-100">BMI</p>
+              <p className="text-sm font-medium opacity-90">BMI</p>
               <p className="text-3xl font-bold">{healthMetrics.bmi}</p>
             </div>
-            <FaHeartbeat className="text-4xl text-cyan-200" />
+            <FaHeartbeat className="text-4xl opacity-80" />
           </div>
         </div>
       </div>
@@ -530,14 +530,14 @@ const UserDashboard = () => {
                 <h4 className="font-semibold text-blue-900">
                   {appointments.find(apt => apt.status === 'confirmed')?.doctor}
                 </h4>
-                <p className="text-blue-700">
+                <p className="text-blue-800">
                   {appointments.find(apt => apt.status === 'confirmed')?.specialty}
                 </p>
-                <p className="text-blue-600 text-sm">
+                <p className="text-blue-700 text-sm">
                   {appointments.find(apt => apt.status === 'confirmed')?.date} at{' '}
                   {appointments.find(apt => apt.status === 'confirmed')?.time}
                 </p>
-                <p className="text-blue-600 text-sm">
+                <p className="text-blue-700 text-sm">
                   {appointments.find(apt => apt.status === 'confirmed')?.location}
                 </p>
               </div>
@@ -568,11 +568,11 @@ const UserDashboard = () => {
           {medicalRecords.slice(0, 3).map((record) => (
             <div key={record.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
               <div className={`w-2 h-2 rounded-full ${
-                record.status === 'completed' ? 'bg-green-500' : 'bg-yellow-500'
+                record.status === 'completed' ? 'bg-cyan-500' : 'bg-blue-500'
               }`} />
               <div className="flex-1">
-                <p className="font-medium">{record.type}</p>
-                <p className="text-sm text-gray-600">
+                <p className="font-medium text-gray-900">{record.type}</p>
+                <p className="text-sm text-gray-700">
                   {record.date} • {record.doctor}
                 </p>
               </div>
@@ -612,7 +612,7 @@ const UserDashboard = () => {
       <div className="space-y-4">
         {isLoadingAppointments ? (
           <div className="dashboard-card p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
             <p className="text-gray-600">Loading appointments...</p>
           </div>
         ) : error ? (
@@ -636,9 +636,9 @@ const UserDashboard = () => {
             <p className="text-sm mb-4">Book your first appointment to get started</p>
             <button 
               onClick={() => navigate('/appointment')}
-              className="btn-primary"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-full font-medium transition-all duration-300 inline-flex items-center gap-2"
             >
-              <FaPlus className="inline mr-2" />
+              <FaPlus />
               Book Appointment
             </button>
           </div>
@@ -652,9 +652,9 @@ const UserDashboard = () => {
                     <FaUser className="text-blue-600 text-xl" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-lg">{appointment.doctor}</h4>
-                    <p className="text-gray-600">{appointment.specialty}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                    <h4 className="font-semibold text-lg text-gray-900">{appointment.doctor}</h4>
+                    <p className="text-gray-700">{appointment.specialty}</p>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                       <span className="flex items-center gap-1">
                         <FaCalendarAlt />
                         {appointment.date}
@@ -669,7 +669,7 @@ const UserDashboard = () => {
                       </span>
                     </div>
                     {appointment.notes && (
-                      <p className="text-gray-600 mt-2 text-sm">{appointment.notes}</p>
+                      <p className="text-gray-700 mt-2 text-sm">{appointment.notes}</p>
                     )}
                   </div>
                 </div>
@@ -743,7 +743,7 @@ const UserDashboard = () => {
       <div className="space-y-4">
         {isLoadingMedicalRecords ? (
           <div className="dashboard-card p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mb-4"></div>
             <p className="text-gray-600">Loading medical records...</p>
           </div>
         ) : medicalRecords.length === 0 ? (
@@ -757,13 +757,13 @@ const UserDashboard = () => {
             <div key={record.id} className="dashboard-card p-6">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <FaFileMedical className="text-green-600 text-xl" />
+                  <div className="w-12 h-12 bg-cyan-100 rounded-full flex items-center justify-center">
+                    <FaFileMedical className="text-cyan-500 text-xl" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-lg">{record.type}</h4>
-                    <p className="text-gray-600">Dr. {record.doctor}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                    <h4 className="font-semibold text-lg text-gray-900">{record.type}</h4>
+                    <p className="text-gray-700">Dr. {record.doctor}</p>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                       <span>{record.date}</span>
                       <span>Results: {record.results}</span>
                     </div>
@@ -828,7 +828,7 @@ const UserDashboard = () => {
       <div className="space-y-4">
         {isLoadingPrescriptions ? (
           <div className="dashboard-card p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
             <p className="text-gray-600">Loading prescriptions...</p>
           </div>
         ) : prescriptions.length === 0 ? (
@@ -842,18 +842,18 @@ const UserDashboard = () => {
             <div key={prescription.id} className="dashboard-card p-6">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                    <FaPills className="text-purple-600 text-xl" />
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <FaPills className="text-blue-600 text-xl" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-lg">{prescription.medication}</h4>
-                    <p className="text-gray-600">Dr. {prescription.prescribedBy}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                    <h4 className="font-semibold text-lg text-gray-900">{prescription.medication}</h4>
+                    <p className="text-gray-700">Dr. {prescription.prescribedBy}</p>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                       <span>Dosage: {prescription.dosage}</span>
                       <span>Duration: {prescription.duration}</span>
                       <span>Refills: {prescription.refills}</span>
                     </div>
-                    <p className="text-gray-600 mt-2 text-sm">Prescribed on {prescription.date}</p>
+                    <p className="text-gray-700 mt-2 text-sm">Prescribed on {prescription.date}</p>
                   </div>
                 </div>
                 
@@ -896,7 +896,7 @@ const UserDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="dashboard-card p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <FaHeartbeat className="text-red-500" />
+            <FaHeartbeat className="text-blue-600" />
             Vital Signs
           </h3>
           <div className="space-y-3">
@@ -917,7 +917,7 @@ const UserDashboard = () => {
 
         <div className="dashboard-card p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <FaUser className="text-blue-500" />
+            <FaUser className="text-cyan-600" />
             Body Metrics
           </h3>
           <div className="space-y-3">
@@ -938,20 +938,20 @@ const UserDashboard = () => {
 
         <div className="dashboard-card p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <FaBell className="text-yellow-500" />
+            <FaBell className="text-blue-600" />
             Reminders
           </h3>
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm">
-              <FaCheckCircle className="text-green-500" />
+              <FaCheckCircle className="text-cyan-600" />
               <span>Take morning medication</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <FaClock className="text-blue-500" />
+              <FaClock className="text-blue-600" />
               <span>Blood pressure check</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <FaExclamationTriangle className="text-orange-500" />
+              <FaExclamationTriangle className="text-blue-600" />
               <span>Schedule follow-up</span>
             </div>
           </div>
@@ -962,9 +962,9 @@ const UserDashboard = () => {
       <div className="dashboard-card p-6">
         <h3 className="text-lg font-semibold mb-4">Health Trends</h3>
         <div className="bg-gray-50 rounded-lg p-8 text-center">
-          <FaHeartbeat className="text-4xl mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Health trends chart will be displayed here</p>
-          <p className="text-sm text-gray-400">Track your progress over time</p>
+          <FaHeartbeat className="text-4xl mx-auto mb-4 text-blue-300" />
+          <p className="text-gray-700">Health trends chart will be displayed here</p>
+          <p className="text-sm text-gray-600">Track your progress over time</p>
         </div>
       </div>
     </div>
@@ -1299,7 +1299,7 @@ const UserDashboard = () => {
           return (
             <div className="modal-content max-w-4xl">
               <h2 className="modal-title flex items-center gap-2">
-                <FaFileMedical className="text-green-600" />
+                <FaFileMedical className="text-cyan-500" />
                 Medical Report Details
               </h2>
               
@@ -1308,7 +1308,7 @@ const UserDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className="info-group">
                     <label className="info-label">Report Type</label>
-                    <p className="info-value font-semibold text-green-700">{selectedItem.type}</p>
+                    <p className="info-value font-semibold text-cyan-600">{selectedItem.type}</p>
                   </div>
                   <div className="info-group">
                     <label className="info-label">Date</label>
@@ -1348,7 +1348,7 @@ const UserDashboard = () => {
                   {selectedItem.treatment && (
                     <div className="info-group">
                       <label className="info-label">Treatment</label>
-                      <div className="info-value bg-green-50 p-3 rounded-lg border-l-4 border-green-500">
+                      <div className="info-value bg-cyan-50 p-3 rounded-lg border-l-4 border-cyan-500">
                         <p className="text-gray-800">{selectedItem.treatment}</p>
                       </div>
                     </div>
@@ -1357,7 +1357,7 @@ const UserDashboard = () => {
                   {selectedItem.notes && (
                     <div className="info-group">
                       <label className="info-label">Additional Notes</label>
-                      <div className="info-value bg-purple-50 p-3 rounded-lg border-l-4 border-purple-500">
+                      <div className="info-value bg-blue-50 p-3 rounded-lg border-l-4 border-blue-600">
                         <p className="text-gray-800">{selectedItem.notes}</p>
                       </div>
                     </div>
@@ -1626,7 +1626,7 @@ const UserDashboard = () => {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Patient Dashboard</h1>
-          <p className="text-gray-600">Manage your health and appointments</p>
+          <p className="text-gray-700">Manage your health and appointments</p>
         </div>
 
       {/* Tabs */}
@@ -1639,8 +1639,8 @@ const UserDashboard = () => {
                 onClick={() => handleTabChange(tab.id)}
                 className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-300'
                 }`}
               >
                 <tab.icon className="inline mr-2" />

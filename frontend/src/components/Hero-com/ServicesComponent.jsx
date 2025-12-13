@@ -1,5 +1,5 @@
 import React from 'react';
-import { BsArrowRight, BsLinkedin, BsTwitter } from 'react-icons/bs';
+import { BsLinkedin, BsTwitter } from 'react-icons/bs';
 import { FaHeartbeat, FaStethoscope, FaUserMd, FaHospital, FaFacebookF } from 'react-icons/fa';
 import { GiMedicines } from 'react-icons/gi';
 import './Serve.css'
@@ -11,13 +11,7 @@ import { Navigation, Pagination } from 'swiper/modules';
 
 
 
-import doc1 from '../../assets/assets_frontend/doc1.png';
-import doc2 from '../../assets/assets_frontend/doc2.png';
-import doc3 from '../../assets/assets_frontend/doc3.png';
-import doc4 from '../../assets/assets_frontend/doc4.png';
-import doc5 from '../../assets/assets_frontend/doc5.png';
-import doc6 from '../../assets/assets_frontend/doc6.png';
-import doc7 from '../../assets/assets_frontend/doc7.png';
+import { doctors as doctorsList } from '../../assets/assets_frontend/assets';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -54,68 +48,20 @@ const services = [
   }
 ];
 
-const doctors = [
-  {
-    name: "Dr. Sarah Johnson",
-    specialty: "Cardiologist",
-    image: doc1,
-    description: "Specialized in cardiovascular diseases with 15+ years of experience.",
-    availability: "Mon - Fri",
-    education: "MD - Cardiology, MBBS"
-  },
-  {
-    name: "Dr. Michael Chen",
-    specialty: "Neurologist",
-    image: doc2,
-    description: "Expert in neurological disorders and brain surgery.",
-    availability: "Tue - Sat",
-    education: "MD - Neurology, MBBS"
-  },
-  {
-    name: "Dr. Emily Brown",
-    specialty: "Pediatrician",
-    image: doc3,
-    description: "Dedicated to providing comprehensive care for children.",
-    availability: "Mon - Sat",
-    education: "MD - Pediatrics, MBBS"
-  },
-  {
-    name: "Dr. James Wilson",
-    specialty: "Orthopedic Surgeon",
-    image: doc4,
-    description: "Specialized in joint replacement and sports injuries.",
-    availability: "Wed - Sun",
-    education: "MD - Orthopedics, MBBS"
-  },
-  {
-    name: "Dr. Maria Rodriguez",
-    specialty: "Dermatologist",
-    image: doc5,
-    description: "Expert in skin conditions and cosmetic dermatology with 12+ years experience.",
-    availability: "Mon - Thu",
-    education: "MD - Dermatology, MBBS"
-  },
-  {
-    name: "Dr. David Kim",
-    specialty: "Oncologist",
-    image: doc6,
-    description: "Specialized in cancer treatment and innovative therapy approaches.",
-    availability: "Tue - Sat",
-    education: "MD - Oncology, MBBS"
-  },
-  {
-    name: "Dr. Lisa Thompson",
-    specialty: "Psychiatrist",
-    image: doc7,
-    description: "Dedicated to mental health and psychological well-being.",
-    availability: "Mon - Fri",
-    education: "MD - Psychiatry, MBBS"
-  }
-];
-
-
 const Services = () => {
   const navigate = useNavigate();
+  
+  // Get first 7 doctors from assets.js
+  const doctors = doctorsList.slice(0, 7).map(doctor => ({
+    name: doctor.name,
+    specialty: doctor.speciality,
+    image: doctor.image,
+    description: doctor.about,
+    availability: "Mon - Fri", // Default availability
+    education: `${doctor.degree} - ${doctor.speciality}`,
+    experience: doctor.experience,
+    hospital: doctor.hospital
+  }));
 
   return (
     <>
@@ -124,74 +70,35 @@ const Services = () => {
           {/* Services Header */}
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Our Services</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-black/80 max-w-2xl mx-auto">
               We offer comprehensive healthcare services to meet all your medical needs with expert care and modern facilities.
             </p>
           </div>
 
           {/* Services Cards */}
-          <div className="flex gap-6 overflow-y-auto p-8 scrollbar-hide h-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4 sm:px-8">
             {services.map((service, index) => (
-              <div key={index} className="cube-container">
-                <div className="cube is-rotating">
-                  {/* Front Face */}
-                  <div className={`cube-face cube-front ${service.frontColor} text-white p-6 rounded-lg shadow-lg`}>
-                    <div className="flex flex-col justify-between h-full">
-                      <div>
-                        {service.icon}
-                        <h3 className="text-xl font-semibold mt-4">{service.title}</h3>
-                      </div>
-                      <div className="flex justify-end">
-                        <BsArrowRight className="w-6 h-6" />
-                      </div>
-                    </div>
+              <div
+                key={index}
+                className={`${service.frontColor} text-white rounded-2xl shadow-lg p-6 flex flex-col justify-between transition-transform duration-300 hover:-translate-y-2`}
+              >
+                <div>
+                  <div className="w-14 h-14 flex items-center justify-center rounded-full bg-white/20">
+                    {service.icon}
                   </div>
-
-                  {/* Back Face */}
-                  <div className={`cube-face cube-back ${service.backColor} text-white p-6 rounded-lg shadow-lg`}>
-                    <div className="flex flex-col justify-center items-center h-full text-center">
-                      <h3 className="text-xl font-semibold mb-3">More Info</h3>
-                      <p className="text-sm mb-4">{service.description}</p>
-                      <button 
-                        onClick={() => navigate('/Services')} 
-                        className="mt-2 px-4 py-2 bg-white text-blue-900 rounded-full text-sm font-medium hover:bg-opacity-90 transition-all"
-                      >
-                        Learn More
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Right Face */}
-                  <div className={`cube-face cube-right ${service.frontColor} text-white p-6 rounded-lg shadow-lg`}>
-                    <div className="flex flex-col justify-center items-center h-full text-center">
-                      <h3 className="text-xl font-semibold">{service.title}</h3>
-                      <div className="mt-4 transform scale-150">
-                        {service.icon}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Left Face */}
-                  <div className={`cube-face cube-left ${service.backColor} text-white p-6 rounded-lg shadow-lg`}>
-                    <div className="flex flex-col justify-center items-center h-full text-center">
-                      <h3 className="text-xl font-semibold">Contact Us</h3>
-                      <p className="text-sm mt-4">Available 24/7</p>
-                    </div>
-                  </div>
-
-                  {/* Top Face */}
-                  <div className={`cube-face cube-top ${service.frontColor} text-white p-6 rounded-lg shadow-lg`}>
-                    <div className="flex justify-center items-center h-full">
-                      {service.icon}
-                    </div>
-                  </div>
-
-                  {/* Bottom Face */}
-                  <div className={`cube-face cube-bottom ${service.backColor} text-white p-6 rounded-lg shadow-lg`}>
-                    <div className="flex justify-center items-center h-full">
-                      <BsArrowRight className="w-8 h-8" />
-                    </div>
-                  </div>
+                  <h3 className="text-2xl font-semibold mt-5">{service.title}</h3>
+                  <p className="text-sm text-white/90 mt-3 leading-relaxed">
+                    {service.description}
+                  </p>
+                </div>
+                <div className="mt-6 flex items-center justify-between">
+                  <span className="text-xs uppercase tracking-wide text-white/80">Available 24/7</span>
+                  <button
+                    onClick={() => navigate('/Services')}
+                    className="px-4 py-2 bg-white text-blue-900 rounded-full text-sm font-medium hover:bg-opacity-90 transition-all"
+                  >
+                    Learn More
+                  </button>
                 </div>
               </div>
             ))}
@@ -209,7 +116,7 @@ const Services = () => {
             <h2 className="text-4xl font-bold text-gray-900 mt-2 mb-4">
               Leading Healthcare Provider
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-black/80 max-w-2xl mx-auto">
               We deliver exceptional medical services with cutting-edge technology and compassionate care
             </p>
           </div>
@@ -240,10 +147,10 @@ const Services = () => {
                   <div className="mb-4">
                     {item.icon}
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                  <h3 className="text-xl font-semibold text-blue-600 mb-3">
                     {item.title}
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-black/80">
                     {item.description}
                   </p>
                 </div>
@@ -263,7 +170,7 @@ const Services = () => {
                 <div className="text-3xl font-bold text-blue-600 mb-2">
                   {stat.number}
                 </div>
-                <div className="text-gray-600">
+                <div className="text-black/80">
                   {stat.label}
                 </div>
               </div>
@@ -282,60 +189,93 @@ const Services = () => {
             <h2 className="text-4xl font-bold text-gray-900 mt-2 mb-4">
               Meet Our Expert Doctors
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-black/600 max-w-2xl mx-auto">
               Our team of highly qualified and experienced medical professionals is dedicated to providing exceptional healthcare services.
             </p>
           </div>
 
-          <Swiper
-            modules={[Navigation, Pagination]}
-            spaceBetween={30}
-            navigation
-            pagination={{ clickable: true }}
-            breakpoints={{
-              0: { slidesPerView: 1 },
-              768: { slidesPerView: 2 },
-              1024: { slidesPerView: 3 },
-            }}
-          >
-            {doctors.map((doctor, index) => (
-              <SwiperSlide key={index} className="flex justify-center">
-                <div className="group [perspective:1000px] w-full max-w-sm">
+          <div className="relative">
+            <button
+              className="swiper-nav-prev absolute left-0 md:-left-16 top-1/2 -translate-y-1/2 -translate-x-1/2 md:-translate-x-1/2 w-16 h-16 rounded-full border border-blue-600 bg-white text-blue-600 text-4xl shadow-lg transition hover:bg-blue-600 hover:text-white"
+              aria-label="Previous doctors"
+            >
+              ‹
+            </button>
+            <button
+              className="swiper-nav-next absolute right-0 md:-right-16 top-1/2 -translate-y-1/2 translate-x-1/2 md:translate-x-1/2 w-16 h-16 rounded-full border border-blue-600 bg-white text-blue-600 text-4xl shadow-lg transition hover:bg-blue-600 hover:text-white"
+              aria-label="Next doctors"
+            >
+              ›
+            </button>
+
+            <Swiper
+              modules={[Navigation, Pagination]}
+              spaceBetween={30}
+              navigation={{
+                prevEl: '.swiper-nav-prev',
+                nextEl: '.swiper-nav-next'
+              }}
+              pagination={{ clickable: true }}
+              breakpoints={{
+                0: { slidesPerView: 1 },
+                768: { slidesPerView: 2 },
+                1024: { slidesPerView: 3 },
+              }}
+            >
+              {doctors.map((doctor, index) => (
+                <SwiperSlide key={index} className="flex justify-center items-center py-4">
+                  <div className="group [perspective:1000px] w-full max-w-sm mx-auto">
                   <div className="relative w-full h-[420px] duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
 
                     {/* Front Side */}
-                    <div className="absolute w-full h-full bg-white rounded-2xl overflow-hidden shadow-md [backface-visibility:hidden]">
-                      <img
-                        src={doctor.image}
-                        alt={doctor.name}
-                        className="w-full h-60 object-cover"
-                      />
-                      <div className="p-4">
-                        <h3 className="text-xl font-semibold text-gray-800">{doctor.name}</h3>
+                    <div className="absolute w-full h-full bg-white rounded-2xl overflow-hidden shadow-md [backface-visibility:hidden] flex flex-col items-center text-center p-6 gap-4">
+                      <div className="w-36 h-36 rounded-full overflow-hidden shadow-lg border-4 border-white bg-gray-100">
+                        <img
+                          src={doctor.image}
+                          alt={doctor.name}
+                          className="w-full h-full object-cover object-center"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-semibold text-blue-800">{doctor.name}</h3>
                         <p className="text-sm text-blue-600">{doctor.specialty}</p>
                       </div>
+                      <p className="text-sm text-black/600">
+                        {doctor.description}
+                      </p>
                     </div>
 
                     {/* Back Side */}
-                    <div className="absolute w-full h-full bg-blue-50 rounded-2xl shadow-lg p-4 text-center [transform:rotateY(180deg)] [backface-visibility:hidden]">
-                      <h3 className="text-lg font-bold text-blue-800 mb-1">{doctor.name}</h3>
-                      <p className="text-sm text-gray-600 mb-4">{doctor.description}</p>
-                      <p className="text-sm text-gray-700 mb-1">
-                        <span className="font-semibold">Available:</span> {doctor.availability}
+                    <div className="absolute w-full h-full bg-blue-50 rounded-2xl shadow-lg p-6 text-center [transform:rotateY(180deg)] [backface-visibility:hidden] flex flex-col items-center justify-center gap-4">
+                      <h3 className="text-xl font-bold text-blue-800">{doctor.name}</h3>
+                      <p className="text-sm text-black/600">
+                        {doctor.description}
                       </p>
-                      <p className="text-sm text-gray-700 mb-4">
-                        <span className="font-semibold">Education:</span> {doctor.education}
-                      </p>
+                      <div className="text-sm text-black/600">
+                        <p>
+                          <span className="font-semibold">Available:</span> {doctor.availability}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Education:</span> {doctor.education}
+                        </p>
+                      </div>
 
-                      <div className="flex gap-4 justify-center mb-4 text-blue-600">
-                        <a href="#"><FaFacebookF /></a>
-                        <a href="#"><BsTwitter /></a>
-                        <a href="#"><BsLinkedin /></a>
+                      <div className="flex gap-4 justify-center text-blue-600 text-lg">
+                        <a href="#" aria-label="Facebook"><FaFacebookF /></a>
+                        <a href="#" aria-label="Twitter"><BsTwitter /></a>
+                        <a href="#" aria-label="LinkedIn"><BsLinkedin /></a>
                       </div>
 
                       <button
-                        onClick={() => navigate('/appointment')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded"
+                        onClick={() => {
+                          // Get the original doctor object from doctorsList
+                          const selectedDoctor = doctorsList[index];
+                          // Store the selected doctor in localStorage
+                          localStorage.setItem('selectedDoctor', JSON.stringify(selectedDoctor));
+                          // Navigate to appointment page
+                          navigate('/appointment');
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-full"
                       >
                         Book Now
                       </button>
@@ -345,7 +285,8 @@ const Services = () => {
                 </div>
               </SwiperSlide>
             ))}
-          </Swiper>
+            </Swiper>
+          </div>
         </div>
       </div>
 

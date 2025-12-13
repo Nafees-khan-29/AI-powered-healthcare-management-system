@@ -3,6 +3,7 @@ import { useUser } from '@clerk/clerk-react';
 import { getDoctorAppointments, updateAppointmentStatus, cancelAppointment } from '../../../services/appointmentService';
 import { createMedicalRecord, getDoctorMedicalRecords, createPrescription, getDoctorPrescriptions, updateMedicalRecord, deleteMedicalRecord } from '../../../services/medicalRecordService';
 import Navbar from '../../Hero-com/Navbar';
+import VideoCallRoom from '../../VideoCall/VideoCallRoom';
 import {
   FaUserMd,
   FaCalendarAlt,
@@ -36,7 +37,10 @@ import {
   FaBell,
   FaCog,
   FaSignOutAlt,
-  FaTimes
+  FaTimes,
+  FaVideo,
+  FaPhoneAlt,
+  FaComments
 } from 'react-icons/fa';
 import './DoctorDashboard.css';
 
@@ -567,6 +571,10 @@ const DoctorDashboard = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDate, setFilterDate] = useState('all');
+  
+  // Video call state
+  const [activeVideoCall, setActiveVideoCall] = useState(false);
+  const [videoCallData, setVideoCallData] = useState(null);
   
   // State for appointments
   const [appointments, setAppointments] = useState([]);
@@ -1354,7 +1362,215 @@ const DoctorDashboard = () => {
     </div>
   );
 
- 
+  // Render Patients Section with Contact Information
+  const renderPatients = () => {
+    const filteredPatients = realPatients.filter(patient => 
+      patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      patient.phone?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const initiateVideoCall = (patient) => {
+      // Generate room ID based on patient and doctor info
+      const roomID = `consultation_${patient.id}_${Date.now()}`;
+      
+      // Set up video call data
+      const callData = {
+        roomID,
+        userID: user.id,
+        userName: `Dr. ${user.firstName} ${user.lastName}`,
+        patientData: {
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          age: patient.age,
+          gender: patient.gender
+        }
+      };
+      
+      console.log('🎥 Initiating video call:', callData);
+      
+      // Start video call
+      setVideoCallData(callData);
+      setActiveVideoCall(true);
+    };
+
+    const initiatePhoneCall = (patient) => {
+      if (patient.phone && patient.phone !== 'N/A') {
+        window.location.href = `tel:${patient.phone}`;
+      } else {
+        alert('Phone number not available for this patient');
+      }
+    };
+
+    const sendEmail = (patient) => {
+      if (patient.email && patient.email !== 'N/A') {
+        window.location.href = `mailto:${patient.email}`;
+      } else {
+        alert('Email not available for this patient');
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Search and Stats */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="search-container">
+            <FaSearch className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search patients by name, email, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          <div className="flex gap-4 items-center">
+            <div className="text-sm text-gray-600">
+              Total Patients: <span className="font-bold text-blue-600">{realPatients.length}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Patients Grid */}
+        {filteredPatients.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-lg shadow">
+            <FaUsers className="mx-auto text-6xl text-gray-300 mb-4" />
+            <p className="text-gray-500 text-lg">No patients found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPatients.map(patient => (
+              <div key={patient.id} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-gray-200">
+                {/* Patient Header */}
+                <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-full flex items-center justify-center">
+                        <FaUser className="text-3xl text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold">{patient.name}</h3>
+                        <p className="text-blue-100 text-sm">ID: {patient.id}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Patient Details */}
+                <div className="p-6 space-y-4">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-500 font-medium">Age</p>
+                      <p className="text-gray-900 font-semibold">{patient.age}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500 font-medium">Gender</p>
+                      <p className="text-gray-900 font-semibold">{patient.gender}</p>
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="space-y-3 border-t pt-4">
+                    <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Contact Information</h4>
+                    
+                    {/* Phone */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <FaPhone className="text-green-600 text-sm" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500">Phone</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{patient.phone}</p>
+                      </div>
+                    </div>
+
+                    {/* Email */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <FaEnvelope className="text-blue-600 text-sm" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">{patient.email}</p>
+                      </div>
+                    </div>
+
+                    {/* Last Visit */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <FaCalendar className="text-purple-600 text-sm" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500">Last Visit</p>
+                        <p className="text-sm font-semibold text-gray-900">{patient.lastVisit || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="border-t pt-4 space-y-2">
+                    <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Quick Actions</h4>
+                    
+                    {/* Video Call Button */}
+                    <button
+                      onClick={() => initiateVideoCall(patient)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
+                    >
+                      <FaVideo className="text-lg" />
+                      Start Video Call
+                    </button>
+
+                    {/* Phone and Email Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => initiatePhoneCall(patient)}
+                        disabled={patient.phone === 'N/A'}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-sm ${
+                          patient.phone === 'N/A'
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        <FaPhoneAlt />
+                        Call
+                      </button>
+
+                      <button
+                        onClick={() => sendEmail(patient)}
+                        disabled={patient.email === 'N/A'}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-semibold text-sm ${
+                          patient.email === 'N/A'
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}
+                      >
+                        <FaEnvelope />
+                        Email
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Patient Status */}
+                  <div className="flex items-center justify-between border-t pt-4">
+                    <span className="text-xs text-gray-500">Status</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      patient.status === 'active' 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {patient.status?.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderMedicalRecords = () => (
     <div className="space-y-6">
@@ -2085,12 +2301,30 @@ const DoctorDashboard = () => {
     fetchDoctorPrescriptions();
   }, [user, isLoaded]);
 
+  // Video call end handler
+  const handleVideoCallEnd = () => {
+    console.log('🔴 Video call ended');
+    setActiveVideoCall(false);
+    setVideoCallData(null);
+  };
+
   return (
     <>
+      {/* Video Call Room - Renders on top of everything when active */}
+      {activeVideoCall && videoCallData && (
+        <VideoCallRoom
+          roomID={videoCallData.roomID}
+          userID={videoCallData.userID}
+          userName={videoCallData.userName}
+          patientData={videoCallData.patientData}
+          onCallEnd={handleVideoCallEnd}
+        />
+      )}
+
       {/* Navbar - positioned outside dashboard container */}
       <Navbar />
       
-      <div className="doctor-dashboard">
+      <div className="doctor-dashboard">{" "}
         {/* Add top padding to account for fixed navbar */}
         <div className="pt-20 ">
         {/* Header */}
@@ -2125,7 +2359,7 @@ const DoctorDashboard = () => {
       <div className="tab-content bg-white">
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'appointments' && renderAppointments()}
-        {/* {activeTab === 'patients' && renderPatients()} */}
+        {activeTab === 'patients' && renderPatients()}
         {activeTab === 'medical-records' && renderMedicalRecords()}
         {activeTab === 'medical-reports' && renderMedicalReports()}
         {activeTab === 'prescriptions' && renderPrescriptions()}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from "react-router-dom";
 import { useUser } from '@clerk/clerk-react';
@@ -108,28 +108,33 @@ const DoctorsComponent = () => {
     }
   };
 
-  // Group doctors by specialization
-  const doctorsBySpecialization = doctors.reduce((groups, doctor) => {
-    const specialization = doctor.specialization || 'General';
-    if (!groups[specialization]) {
-      groups[specialization] = [];
-    }
-    groups[specialization].push(doctor);
-    return groups;
-  }, {});
+  // Group doctors by specialization - memoized for performance
+  const doctorsBySpecialization = useMemo(() => {
+    return doctors.reduce((groups, doctor) => {
+      const specialization = doctor.specialization || 'General';
+      if (!groups[specialization]) {
+        groups[specialization] = [];
+      }
+      groups[specialization].push(doctor);
+      return groups;
+    }, {});
+  }, [doctors]);
 
-  // Filter doctors based on selected category and search term
-  const filteredDoctors = selectedCategory === 'All'
-    ? doctors.filter(doctor =>
-        doctor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.specialization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.degree?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : (doctorsBySpecialization[selectedCategory] || []).filter(doctor =>
-        doctor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.specialization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.degree?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  // Filter doctors based on selected category and search term - memoized
+  const filteredDoctors = useMemo(() => {
+    const baseList = selectedCategory === 'All'
+      ? doctors
+      : (doctorsBySpecialization[selectedCategory] || []);
+    
+    if (!searchTerm) return baseList;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return baseList.filter(doctor =>
+      doctor.name?.toLowerCase().includes(searchLower) ||
+      doctor.specialization?.toLowerCase().includes(searchLower) ||
+      doctor.degree?.toLowerCase().includes(searchLower)
+    );
+  }, [doctors, selectedCategory, searchTerm, doctorsBySpecialization]);
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20"> {/* Added pt-20 for navbar space */}
@@ -143,12 +148,12 @@ const DoctorsComponent = () => {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}
         <div className={`
-          lg:w-64 bg-white shadow-lg p-6 
-          ${isMenuOpen ? 'block' : 'hidden'} 
-          lg:block fixed lg:sticky top-20 h-[calc(100vh-5rem)]
+          bg-white shadow-lg p-6 rounded-2xl
+          ${isMenuOpen ? 'block' : 'hidden'}
+          lg:block lg:w-64 lg:sticky lg:top-24 lg:h-[calc(100vh-6rem)]
           overflow-y-auto z-10
         `}>
           <h2 className="text-xl font-bold mb-6 text-gray-800">Specializations</h2>
@@ -188,7 +193,7 @@ const DoctorsComponent = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6 lg:pl-8">
+  <div className="flex-1 p-4 sm:p-6 lg:pl-10">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900 mb-4 md:mb-0">
               {selectedCategory === 'All' ? 'All Doctors' : `${selectedCategory} Specialists`}
@@ -214,14 +219,14 @@ const DoctorsComponent = () => {
           </div>
           
           <motion.div 
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
           >
             {loading ? (
-              // Loading state
-              Array.from({ length: 6 }).map((_, index) => (
+              // Loading state with skeleton placeholders - reduced for faster initial render
+              Array.from({ length: 3 }).map((_, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
@@ -229,7 +234,7 @@ const DoctorsComponent = () => {
                   transition={{ delay: index * 0.1 }}
                   className="bg-white rounded-xl shadow-md overflow-hidden animate-pulse"
                 >
-                  <div className="w-full h-48 bg-gray-300"></div>
+                  <div className="w-full h-64 bg-gray-300"></div>
                   <div className="p-6">
                     <div className="h-6 bg-gray-300 rounded mb-2"></div>
                     <div className="h-4 bg-gray-300 rounded mb-2"></div>
@@ -252,18 +257,22 @@ const DoctorsComponent = () => {
                   key={doctor._id || index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  transition={{ delay: Math.min(index * 0.05, 0.3) }}
                   className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
                 >
-                  <img
-                    src={doctor.image}
-                    alt={doctor.name}
-                    className="w-full h-48 object-cover"
-                    onError={(e) => {
-                      // Fallback to a default image if the main image fails
-                      e.target.src = staticDoctors[0]?.image || '/src/assets/doctor1.jpg';
-                    }}
-                  />
+                  <div className="w-full h-64 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <img
+                      src={doctor.image}
+                      alt={doctor.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover object-top"
+                      onError={(e) => {
+                        // Fallback to a default image if the main image fails
+                        e.target.src = staticDoctors[0]?.image || '/src/assets/doctor1.jpg';
+                      }}
+                    />
+                  </div>
                   <div className="p-6">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">
                       {doctor.name}
@@ -271,7 +280,7 @@ const DoctorsComponent = () => {
                     <p className="text-blue-600 font-medium mb-2">
                       {doctor.specialization || 'General'}
                     </p>
-                    <div className="space-y-2 text-gray-600 text-sm mb-4">
+                    <div className="space-y-2 text-gray-900 text-sm mb-4">
                       <p>Experience: {doctor.experience || 'N/A'}</p>
                       <p>Available: {doctor.availability || 'Mon-Fri'}</p>
                       <p>Education: {doctor.education || doctor.degree || 'N/A'}</p>

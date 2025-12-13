@@ -1,6 +1,6 @@
 [
   {
-    "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "id": "674d1a2b3c4d5e6f7a8b9c0d",
     "full_name": "Dr. Sarah Mitchell",
     "email": "sarah.mitchell@healthcare.com",
     "password": "Doctor@123",
@@ -15,7 +15,7 @@
     "active": true
   },
   {
-    "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+    "id": "674d1a2b3c4d5e6f7a8b9c0e",
     "full_name": "Dr. Michael Chen",
     "email": "michael.chen@healthcare.com",
     "password": "MedDoc@456",
@@ -30,7 +30,7 @@
     "active": true
   },
   {
-    "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+    "id": "674d1a2b3c4d5e6f7a8b9c0f",
     "full_name": "Dr. Emily Rodriguez",
     "email": "emily.rodriguez@healthcare.com",
     "password": "Emily@789",
@@ -45,7 +45,7 @@
     "active": true
   },
   {
-    "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+    "id": "674d1a2b3c4d5e6f7a8b9c10",
     "full_name": "Dr. James Anderson",
     "email": "james.anderson@healthcare.com",
     "password": "James@2023",
@@ -60,7 +60,7 @@
     "active": true
   },
   {
-    "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+    "id": "674d1a2b3c4d5e6f7a8b9c11",
     "full_name": "Dr. Priya Patel",
     "email": "priya.patel@healthcare.com",
     "password": "Priya@1234",
@@ -75,7 +75,7 @@
     "active": true
   },
   {
-    "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+    "id": "674d1a2b3c4d5e6f7a8b9c12",
     "full_name": "Dr. Robert Williams",
     "email": "robert.williams@healthcare.com",
     "password": "Robert@567",
@@ -90,7 +90,7 @@
     "active": true
   },
   {
-    "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+    "id": "674d1a2b3c4d5e6f7a8b9c13",
     "full_name": "Dr. Lisa Thompson",
     "email": "lisa.thompson@healthcare.com",
     "password": "Lisa@8910",
@@ -105,7 +105,7 @@
     "active": true
   },
   {
-    "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+    "id": "674d1a2b3c4d5e6f7a8b9c14",
     "full_name": "Dr. David Kim",
     "email": "david.kim@healthcare.com",
     "password": "David@2024",
@@ -120,7 +120,7 @@
     "active": true
   },
   {
-    "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+    "id": "674d1a2b3c4d5e6f7a8b9c15",
     "full_name": "Dr. Maria Garcia",
     "email": "maria.garcia@healthcare.com",
     "password": "Maria@3456",
@@ -135,7 +135,7 @@
     "active": true
   },
   {
-    "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+    "id": "674d1a2b3c4d5e6f7a8b9c16",
     "full_name": "Dr. Thomas Brown",
     "email": "thomas.brown@healthcare.com",
     "password": "Thomas@7890",
@@ -150,7 +150,7 @@
     "active": true
   },
   {
-    "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+    "id": "674d1a2b3c4d5e6f7a8b9c17",
     "full_name": "Dr. Jennifer Lee",
     "email": "jennifer.lee@healthcare.com",
     "password": "Jennifer@111",
@@ -165,7 +165,7 @@
     "active": true
   },
   {
-    "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+    "id": "674d1a2b3c4d5e6f7a8b9c18",
     "full_name": "Dr. Ahmed Hassan",
     "email": "ahmed.hassan@healthcare.com",
     "password": "Ahmed@2222",
@@ -180,7 +180,7 @@
     "active": true
   },
   {
-    "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+    "id": "674d1a2b3c4d5e6f7a8b9c19",
     "full_name": "Dr. Rachel Cohen",
     "email": "rachel.cohen@healthcare.com",
     "password": "Rachel@3333",
@@ -195,7 +195,7 @@
     "active": true
   },
   {
-    "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+    "id": "674d1a2b3c4d5e6f7a8b9c1a",
     "full_name": "Dr. Kevin O'Brien",
     "email": "kevin.obrien@healthcare.com",
     "password": "Kevin@4444",
@@ -210,7 +210,7 @@
     "active": true
   },
   {
-    "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+    "id": "674d1a2b3c4d5e6f7a8b9c1b",
     "full_name": "Dr. Aisha Mohammed",
     "email": "aisha.mohammed@healthcare.com",
     "password": "Aisha@5555",
@@ -222,6 +222,22 @@
     "dob": "1992-05-23",
     "gender": "Female",
     "registration_date": "2023-04-25",
+    "active": true
+  },
+
+   {
+    "id": "674d1a2b3c4d5e6f7a8b9c1c",
+    "full_name": "Dr. Muzammil Khan",
+    "email": "muzammilahmedk3@healthcare.com",
+    "password": "Muzammil@4444",
+    "specialization": "Heart Surgeon",
+    "license_number": "MD-2017-44455",
+    "phone": "+1-555-0114",
+    "address": "777 Kidney Care Way, Portland, OR 97201",
+    "hospital": "Oregon Health & Science University",
+    "dob": "1982-07-19",
+    "gender": "Male",
+    "registration_date": "2023-02-08",
     "active": true
   }
 ]

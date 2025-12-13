@@ -1,7 +1,7 @@
 /* User Dashboard Styles */
 .user-dashboard {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%);
   padding: 2rem;
 }
 
@@ -48,10 +48,10 @@
 
 /* Button Styles */
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #3b82f6;
   color: white;
   padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  border-radius: 9999px;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -59,18 +59,20 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary:hover {
+  background: #2563eb;
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 .btn-secondary {
   background: white;
-  color: #374151;
+  color: #3b82f6;
   padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  border-radius: 9999px;
   font-weight: 600;
   border: 2px solid #e5e7eb;
   cursor: pointer;
@@ -81,35 +83,39 @@
 }
 
 .btn-secondary:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  transform: translateY(-1px);
+  background: #f3f4f6;
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 /* Card Styles */
 .dashboard-card {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.025);
   transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #f3f4f6;
   overflow: hidden;
 }
 
 .dashboard-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 10px 25px rgba(30, 58, 138, 0.1), 0 4px 10px rgba(30, 58, 138, 0.05);
+  border-color: #e5e7eb;
 }
 
 /* Stat Card Styles */
 .stat-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-radius: 16px;
+  background: white;
+  color: #1e3a8a;
+  border-radius: 20px;
   padding: 1.5rem;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
 }
 
 .stat-card::before {
@@ -119,7 +125,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -129,29 +135,32 @@
 }
 
 .stat-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 30px rgba(0, 0, 0, 0.12);
 }
 
 .stat-card.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e3a8a;
 }
 
 .stat-card.success {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  background: linear-gradient(135deg, #a5f3fc 0%, #67e8f9 100%);
+  color: #0e7490;
 }
 
 .stat-card.warning {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);
+  color: #0e7490;
 }
 
 .stat-card.info {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
 }
 
 /* Status Badge Styles */
 .status-badge {
-  padding: 0.25rem 0.75rem;
+  padding: 0.375rem 1rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;
@@ -161,77 +170,92 @@
 }
 
 .status-badge.confirmed {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: #a5f3fc;
+  color: #155e75;
+  border: 1px solid #22d3ee;
 }
 
 .status-badge.pending {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: #bfdbfe;
+  color: #1e40af;
+  border: 1px solid #60a5fa;
 }
 
 .status-badge.cancelled {
-  background-color: #fee2e2;
+  background-color: #fecaca;
   color: #991b1b;
+  border: 1px solid #f87171;
 }
 
 .status-badge.completed {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: #a5f3fc;
+  color: #0e7490;
+  border: 1px solid #22d3ee;
 }
 
 .status-badge.active {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: #a5f3fc;
+  color: #0e7490;
+  border: 1px solid #22d3ee;
 }
 
 .status-badge.inactive {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: #e5e7eb;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
 }
 
 /* Action Button Styles */
 .action-btn {
-  padding: 0.5rem;
-  border-radius: 8px;
+  padding: 0.625rem;
+  border-radius: 12px;
   transition: all 0.2s ease;
   border: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2rem;
-  min-height: 2rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
 }
 
 .action-btn.view {
   color: #3b82f6;
   background-color: #eff6ff;
+  border: 1px solid #dbeafe;
 }
 
 .action-btn.view:hover {
   background-color: #dbeafe;
-  transform: scale(1.1);
+  border-color: #60a5fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
 .action-btn.edit {
-  color: #10b981;
-  background-color: #ecfdf5;
+  color: #06b6d4;
+  background-color: #ecfeff;
+  border: 1px solid #cffafe;
 }
 
 .action-btn.edit:hover {
-  background-color: #d1fae5;
-  transform: scale(1.1);
+  background-color: #cffafe;
+  border-color: #22d3ee;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
 }
 
 .action-btn.delete {
   color: #ef4444;
   background-color: #fef2f2;
+  border: 1px solid #fee2e2;
 }
 
 .action-btn.delete:hover {
   background-color: #fee2e2;
-  transform: scale(1.1);
+  border-color: #f87171;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
 /* Modal Styles */
@@ -322,12 +346,13 @@
 
 /* Welcome Section Styles */
 .welcome-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
   color: white;
-  border-radius: 16px;
+  border-radius: 24px;
   padding: 2rem;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.25);
 }
 
 .welcome-section::before {
@@ -337,7 +362,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -383,65 +408,71 @@
 /* Appointment Card Styles */
 .appointment-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
   border-left: 4px solid #3b82f6;
+  border: 1px solid #f3f4f6;
 }
 
 .appointment-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.12);
+  border-color: #dbeafe;
 }
 
 .appointment-card.confirmed {
-  border-left-color: #10b981;
+  border-left: 4px solid #06b6d4;
 }
 
 .appointment-card.pending {
-  border-left-color: #f59e0b;
+  border-left: 4px solid #60a5fa;
 }
 
 .appointment-card.cancelled {
-  border-left-color: #ef4444;
+  border-left: 4px solid #f87171;
 }
 
 .appointment-card.completed {
-  border-left-color: #3b82f6;
+  border-left: 4px solid #22d3ee;
 }
 
 /* Medical Record Styles */
 .medical-record-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
-  border-left: 4px solid #10b981;
+  border-left: 4px solid #06b6d4;
+  border: 1px solid #f3f4f6;
 }
 
 .medical-record-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(6, 182, 212, 0.12);
+  border-color: #cffafe;
 }
 
 /* Prescription Styles */
 .prescription-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
-  border-left: 4px solid #8b5cf6;
+  border-left: 4px solid #3b82f6;
+  border: 1px solid #f3f4f6;
 }
 
 .prescription-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.12);
+  border-color: #dbeafe;
 }
 
 /* Icon Styles */
@@ -458,12 +489,12 @@
 
 .icon-circle.blue {
   background-color: #dbeafe;
-  color: #1d4ed8;
+  color: #3b82f6;
 }
 
 .icon-circle.green {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: #cffafe;
+  color: #06b6d4;
 }
 
 .icon-circle.purple {
@@ -628,7 +659,7 @@
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
   .user-dashboard {
-    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    background: #ffffff;
   }
   
   .tab-content,
@@ -638,8 +669,8 @@
   .medical-record-card,
   .prescription-card,
   .metric-card {
-    background: #374151;
-    color: #f9fafb;
+    background: #0045b3;
+    color: #fff200;
   }
   
   .form-input,
@@ -650,11 +681,11 @@
   }
   
   .form-input:focus {
-    border-color: #60a5fa;
+    border-color: #3b82f6;
   }
   
   .welcome-section {
-    background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
   }
 }
 
