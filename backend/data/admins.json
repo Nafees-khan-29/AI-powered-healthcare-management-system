@@ -14,13 +14,14 @@
     "gender": "Male",
     "registration_date": "2023-01-01",
     "active": true,
-    "permissions": [
+     "permissions": [
       "manage_doctors",
       "manage_patients",
       "manage_appointments",
       "view_reports",
       "manage_users",
-      "system_settings"
+      "system_settings",
+      "manage_admins"
     ]
   },
   {
