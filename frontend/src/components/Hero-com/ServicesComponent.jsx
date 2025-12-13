@@ -11,13 +11,7 @@ import { Navigation, Pagination } from 'swiper/modules';
 
 
 
-import doc1 from '../../assets/assets_frontend/doc1.png';
-import doc2 from '../../assets/assets_frontend/doc2.png';
-import doc3 from '../../assets/assets_frontend/doc3.png';
-import doc4 from '../../assets/assets_frontend/doc4.png';
-import doc5 from '../../assets/assets_frontend/doc5.png';
-import doc6 from '../../assets/assets_frontend/doc6.png';
-import doc7 from '../../assets/assets_frontend/doc7.png';
+import { doctors as doctorsList } from '../../assets/assets_frontend/assets';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -54,68 +48,20 @@ const services = [
   }
 ];
 
-const doctors = [
-  {
-    name: "Dr.  Michael Chen",
-    specialty: "Cardiologist",
-    image: doc1,
-    description: "Specialized in cardiovascular diseases with 15+ years of experience.",
-    availability: "Mon - Fri",
-    education: "MD - Cardiology, MBBS"
-  },
-  {
-    name: "Dr. Sarah Johnson",
-    specialty: "Neurologist",
-    image: doc2,
-    description: "Expert in neurological disorders and brain surgery.",
-    availability: "Tue - Sat",
-    education: "MD - Neurology, MBBS"
-  },
-  {
-    name: "Dr. William Davis",
-    specialty: "Pediatrician",
-    image: doc3,
-    description: "Dedicated to providing comprehensive care for children.",
-    availability: "Mon - Sat",
-    education: "MD - Pediatrics, MBBS"
-  },
-  {
-    name: "Dr. James Wilson",
-    specialty: "Orthopedic Surgeon",
-    image: doc4,
-    description: "Specialized in joint replacement and sports injuries.",
-    availability: "Wed - Sun",
-    education: "MD - Orthopedics, MBBS"
-  },
-  {
-    name: "Dr. Maria Rodriguez",
-    specialty: "Dermatologist",
-    image: doc5,
-    description: "Expert in skin conditions and cosmetic dermatology with 12+ years experience.",
-    availability: "Mon - Thu",
-    education: "MD - Dermatology, MBBS"
-  },
-  {
-    name: "Dr. David Kim",
-    specialty: "Oncologist",
-    image: doc6,
-    description: "Specialized in cancer treatment and innovative therapy approaches.",
-    availability: "Tue - Sat",
-    education: "MD - Oncology, MBBS"
-  },
-  {
-    name: "Dr. John Thompson",
-    specialty: "Psychiatrist",
-    image: doc7,
-    description: "Dedicated to mental health and psychological well-being.",
-    availability: "Mon - Fri",
-    education: "MD - Psychiatry, MBBS"
-  }
-];
-
-
 const Services = () => {
   const navigate = useNavigate();
+  
+  // Get first 7 doctors from assets.js
+  const doctors = doctorsList.slice(0, 7).map(doctor => ({
+    name: doctor.name,
+    specialty: doctor.speciality,
+    image: doctor.image,
+    description: doctor.about,
+    availability: "Mon - Fri", // Default availability
+    education: `${doctor.degree} - ${doctor.speciality}`,
+    experience: doctor.experience,
+    hospital: doctor.hospital
+  }));
 
   return (
     <>
@@ -321,7 +267,14 @@ const Services = () => {
                       </div>
 
                       <button
-                        onClick={() => navigate('/appointment')}
+                        onClick={() => {
+                          // Get the original doctor object from doctorsList
+                          const selectedDoctor = doctorsList[index];
+                          // Store the selected doctor in localStorage
+                          localStorage.setItem('selectedDoctor', JSON.stringify(selectedDoctor));
+                          // Navigate to appointment page
+                          navigate('/appointment');
+                        }}
                         className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-full"
                       >
                         Book Now

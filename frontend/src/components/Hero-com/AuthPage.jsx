@@ -139,6 +139,7 @@ const AuthPage = () => {
               <h1 className="overlay-title">Hello, Friend!</h1>
               <p className="overlay-text">
                 Enter your personal details and start journey with us
+               
               </p>
               <button
                 className="overlay-button"

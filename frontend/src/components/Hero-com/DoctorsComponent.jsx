@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from "react-router-dom";
 import { useUser } from '@clerk/clerk-react';
@@ -108,28 +108,33 @@ const DoctorsComponent = () => {
     }
   };
 
-  // Group doctors by specialization
-  const doctorsBySpecialization = doctors.reduce((groups, doctor) => {
-    const specialization = doctor.specialization || 'General';
-    if (!groups[specialization]) {
-      groups[specialization] = [];
-    }
-    groups[specialization].push(doctor);
-    return groups;
-  }, {});
+  // Group doctors by specialization - memoized for performance
+  const doctorsBySpecialization = useMemo(() => {
+    return doctors.reduce((groups, doctor) => {
+      const specialization = doctor.specialization || 'General';
+      if (!groups[specialization]) {
+        groups[specialization] = [];
+      }
+      groups[specialization].push(doctor);
+      return groups;
+    }, {});
+  }, [doctors]);
 
-  // Filter doctors based on selected category and search term
-  const filteredDoctors = selectedCategory === 'All'
-    ? doctors.filter(doctor =>
-        doctor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.specialization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.degree?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : (doctorsBySpecialization[selectedCategory] || []).filter(doctor =>
-        doctor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.specialization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doctor.degree?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  // Filter doctors based on selected category and search term - memoized
+  const filteredDoctors = useMemo(() => {
+    const baseList = selectedCategory === 'All'
+      ? doctors
+      : (doctorsBySpecialization[selectedCategory] || []);
+    
+    if (!searchTerm) return baseList;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return baseList.filter(doctor =>
+      doctor.name?.toLowerCase().includes(searchLower) ||
+      doctor.specialization?.toLowerCase().includes(searchLower) ||
+      doctor.degree?.toLowerCase().includes(searchLower)
+    );
+  }, [doctors, selectedCategory, searchTerm, doctorsBySpecialization]);
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20"> {/* Added pt-20 for navbar space */}
@@ -217,11 +222,11 @@ const DoctorsComponent = () => {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
           >
             {loading ? (
-              // Loading state with skeleton placeholders
-              Array.from({ length: 6 }).map((_, index) => (
+              // Loading state with skeleton placeholders - reduced for faster initial render
+              Array.from({ length: 3 }).map((_, index) => (
                 <motion.div
                   key={index}
                   initial={{ opacity: 0, y: 20 }}
@@ -252,13 +257,15 @@ const DoctorsComponent = () => {
                   key={doctor._id || index}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  transition={{ delay: Math.min(index * 0.05, 0.3) }}
                   className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   <div className="w-full h-64 bg-gray-100 flex items-center justify-center overflow-hidden">
                     <img
                       src={doctor.image}
                       alt={doctor.name}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover object-top"
                       onError={(e) => {
                         // Fallback to a default image if the main image fails

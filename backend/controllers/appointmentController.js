@@ -140,27 +140,35 @@ const createAppointment = async (req, res) => {
         let consultationFee = 0;
 
         if (doctorId && doctorId !== 'temp-id') {
-            // Validate doctor exists
+            // Try to validate doctor exists in MongoDB
             doctor = await doctorModel.findById(doctorId);
-            if (!doctor) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Doctor not found'
-                });
-            }
+            
+            if (doctor) {
+                console.log('✅ Doctor found in MongoDB:', doctor.name);
+                
+                // Check if doctor is available
+                if (!doctor.available) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Doctor is currently unavailable'
+                    });
+                }
 
-            // Check if doctor is available
-            if (!doctor.available) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Doctor is currently unavailable'
-                });
+                // Use doctor data from database
+                finalDoctorName = doctor.name;
+                finalDoctorSpecialization = doctor.specialization;
+                consultationFee = doctor.fees;
+            } else {
+                console.log('⚠️ Doctor not found in MongoDB, using provided data');
+                // Doctor not in MongoDB yet (static data from frontend)
+                // Use the provided doctor info instead
+                if (!doctorName || !doctorSpecialization) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Doctor information is required'
+                    });
+                }
             }
-
-            // Use doctor data from database
-            finalDoctorName = doctor.name;
-            finalDoctorSpecialization = doctor.specialization;
-            consultationFee = doctor.fees;
         } else if (!doctorName || !doctorSpecialization) {
             // If no doctorId and no doctor details provided
             return res.status(400).json({

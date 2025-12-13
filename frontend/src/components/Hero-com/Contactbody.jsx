@@ -8,33 +8,47 @@ const Contactbody = () => {
   return (
     <section className="pt-24 pb-20 bg-gray-200 text-gray-800">
       {/* Banner */}
-      <div className="relative max-w-6xl mx-auto mb-12">
+      <div className="relative max-w-6xl mx-auto mb-12 px-4">
         <div className="rounded-3xl overflow-hidden bg-blue-900 text-white shadow-2xl">
-          <div className="relative h-[320px] flex flex-col md:flex-row items-stretch">
-            <div className="flex-1 p-10 relative z-10">
+          <div className="relative min-h-[320px] flex flex-col md:flex-row items-stretch">
+            {/* Mobile: Background doctor image with transparency */}
+            <div className="absolute md:hidden inset-0 opacity-15 overflow-hidden">
+              <img
+                src={doc13}
+                alt="Contact"
+                // loading="lazy"
+                // decoding="async"
+                className="w-full h-auto object-contain object-top scale-110"
+              />
+            </div>
+            
+            <div className="flex-1 p-6 md:p-10 relative z-10">
               <p className="text-blue-100 uppercase tracking-[0.4em] text-xs">We'd love to hear from you</p>
-              <h1 className="text-4xl md:text-5xl font-bold leading-tight mt-4">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mt-4">
                 Let’s design your next medical experience together
               </h1>
-              <p className="mt-4 text-blue-50/80 text-sm md:text-base max-w-xl">
+              <p className="mt-4 text-blue-50/90 text-sm md:text-base max-w-xl">
                 Reach our care coordinators 24/7. We respond faster than the industry average and provide a dedicated specialist for every query.
               </p>
               <div className="mt-6 flex flex-wrap gap-4 text-sm font-medium">
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur">
+                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur">
                   <FaHeadset /> 24/7 Care Concierge
                 </span>
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur">
+                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur">
                   <FaClock /> Avg response under 15 min
                 </span>
               </div>
             </div>
-            <div className="hidden md:block flex-1 relative">
+            
+            {/* Desktop: Doctor image showing - responsive sizing */}
+            <div className="hidden md:flex md:w-72 lg:w-80 xl:w-96 relative overflow-hidden items-center justify-center">
               <img
                 src={doc13}
                 alt="Contact"
-                className="w-full h-full object-cover object-top"
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-cover object-top md:scale-110 lg:scale-115 xl:scale-125"
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-blue-900/80" />
             </div>
           </div>
         </div>
