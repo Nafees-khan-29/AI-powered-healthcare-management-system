@@ -9,6 +9,8 @@ import doctorRouter from './routes/doctorRoutes.js';
 import appointmentRouter from './routes/appointmentRoutes.js';
 import medicalRecordRouter from './routes/medicalRecordRoutes.js';
 import prescriptionRouter from './routes/prescriptionRoutes.js';
+import healthMetricRouter from './routes/healthMetricRoutes.js';
+import emergencyAlertRouter from './routes/emergencyAlertRoutes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,6 +28,10 @@ const PORT = process.env.PORT || 3000;
 connectDB();
 connectCloudinary();
 
+// Note: Notification routes commented out until CommonJS/ES module compatibility is resolved
+// import notificationRouter from './routes/notificationRoutes.js';
+// app.use('/api/notifications', notificationRouter);
+
 // API endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminrouter);
@@ -33,6 +39,8 @@ app.use('/api/doctors', doctorRouter);
 app.use('/api/appointments', appointmentRouter);
 app.use('/api/medical-records', medicalRecordRouter);
 app.use('/api/prescriptions', prescriptionRouter);
+app.use('/api/health-metrics', healthMetricRouter);
+app.use('/api/emergency-alerts', emergencyAlertRouter);
 
 app.get('/', (req, res) => {
     res.send('API is running - Healthcare Management System');

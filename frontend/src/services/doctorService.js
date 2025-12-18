@@ -129,3 +129,32 @@ export const toggleDoctorAvailability = async (doctorId) => {
         throw error;
     }
 };
+
+// Send video call link to patient
+export const sendPatientVideoCallLink = async (patientEmail, patientName, videoCallLink, doctorName) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/doctors/send-video-link`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                patientEmail,
+                patientName,
+                videoCallLink,
+                doctorName
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to send video call link');
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error sending patient video call link:', error);
+        throw error;
+    }
+};

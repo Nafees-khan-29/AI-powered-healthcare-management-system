@@ -1,26 +1,17 @@
 // Email Configuration Guide
 // 
-// For Gmail:
-// 1. Go to your Google Account settings
-// 2. Enable 2-Step Verification
-// 3. Generate an App Password:
-//    - Go to https://myaccount.google.com/apppasswords
-//    - Select 'Mail' and your device
-//    - Copy the generated 16-character password
-// 4. Add to your .env file:
-//    EMAIL_USER=your-email@gmail.com
-//    EMAIL_PASSWORD=your-16-char-app-password
+// Brevo SMTP Configuration
+// Using Brevo (formerly Sendinblue) for reliable email delivery
 //
-// For other email providers, check their SMTP settings
+// Current Configuration: nafeeskhan7627@gmail.com via Brevo SMTP
 
 export const emailConfig = {
-    service: 'gmail', // or 'outlook', 'yahoo', etc.
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: process.env.EMAIL_PORT || 587,
-    secure: false, // true for 465, false for other ports
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD
     }
 };
 

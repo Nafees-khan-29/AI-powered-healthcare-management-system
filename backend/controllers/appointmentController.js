@@ -2,12 +2,14 @@ import appointmentModel from "../models/appointmentModel.js";
 import doctorModel from "../models/doctorModel.js";
 import nodemailer from "nodemailer";
 
-// Email configuration
+// Email configuration with Brevo SMTP
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
     auth: {
-        user: process.env.EMAIL_USER || 'your-email@gmail.com',
-        pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD
     }
 });
 
@@ -15,7 +17,7 @@ const transporter = nodemailer.createTransport({
 const sendConfirmationEmail = async (appointmentData) => {
     try {
         const mailOptions = {
-            from: process.env.EMAIL_USER || 'ProHealth <noreply@prohealth.com>',
+            from: `ProHealth <${process.env.SENDER_EMAIL}>`,
             to: appointmentData.patientEmail,
             subject: 'Appointment Confirmed - ProHealth',
             html: `
@@ -130,6 +132,97 @@ const createAppointment = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: `Missing required fields: ${missingFields.join(', ')}`
+            });
+        }
+
+        // Validate phone number - must be exactly 10 digits
+        const phoneRegex = /^[0-9]{10}$/;
+        const cleanedPhone = patientPhone.replace(/[^0-9]/g, ''); // Remove any non-digit characters
+        
+        if (!phoneRegex.test(cleanedPhone)) {
+            console.error('❌ Invalid phone number:', patientPhone);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid phone number. Please enter a valid 10-digit phone number.'
+            });
+        }
+
+        // Validate appointment is not in the past
+        const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+        const now = new Date();
+        
+        if (appointmentDateTime < now) {
+            console.error('❌ Cannot book appointment in the past:', {
+                requestedDateTime: appointmentDateTime,
+                currentDateTime: now
+            });
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot book an appointment in the past. Please select a future date and time.'
+            });
+        }
+
+        // Validate appointment is within working hours
+        const appointmentDate_obj = new Date(appointmentDate);
+        const dayOfWeek = appointmentDate_obj.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = dayNames[dayOfWeek];
+
+        // Default working schedule: Monday-Friday 9AM-5PM, Saturday & Sunday OFF
+        const workingDays = [1, 2, 3, 4, 5]; // Monday to Friday
+        const workingHourStart = 9; // 9 AM
+        const workingHourEnd = 17; // 5 PM (17:00 in 24-hour format)
+
+        // Check if appointment is on a working day
+        if (!workingDays.includes(dayOfWeek)) {
+            console.error('❌ Appointment on non-working day:', {
+                date: appointmentDate,
+                day: dayName
+            });
+            return res.status(400).json({
+                success: false,
+                message: `Cannot book an appointment on ${dayName}. Doctors are only available Monday through Friday.`
+            });
+        }
+
+        // Parse appointment time and validate working hours
+        const timeMatch = appointmentTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!timeMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid time format. Please use format: HH:MM AM/PM'
+            });
+        }
+
+        let hours = parseInt(timeMatch[1]);
+        const minutes = parseInt(timeMatch[2]);
+        const period = timeMatch[3].toUpperCase();
+
+        // Convert to 24-hour format
+        if (period === 'PM' && hours !== 12) {
+            hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+            hours = 0;
+        }
+
+        // Check if time is within working hours (9 AM to 5 PM)
+        if (hours < workingHourStart || hours >= workingHourEnd) {
+            console.error('❌ Appointment outside working hours:', {
+                time: appointmentTime,
+                hours24: hours,
+                workingHours: `${workingHourStart}:00 - ${workingHourEnd}:00`
+            });
+            return res.status(400).json({
+                success: false,
+                message: `Cannot book an appointment at ${appointmentTime}. Working hours are 9:00 AM to 5:00 PM, Monday through Friday.`
+            });
+        }
+
+        // If appointment is at the last hour (4:00 PM - 4:59 PM), check if it ends before 5 PM
+        if (hours === workingHourEnd - 1 && minutes > 30) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot book an appointment after 4:30 PM as appointments last 30 minutes and clinic closes at 5:00 PM.'
             });
         }
 
@@ -651,7 +744,11 @@ export {
     cancelAppointment,
     updateAppointment,
     getAllAppointments,
-    getBookedSlots
+    getBookedSlots,
+    checkSlotAvailability,
+    getAvailableSlots,
+    getDoctorAvailability,
+    findNearestSlot
 };
 
 // Get booked time slots for a specific doctor and date
@@ -696,6 +793,146 @@ const getBookedSlots = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Error fetching booked slots',
+            error: error.message
+        });
+    }
+};
+
+// ============================================
+// SMART SCHEDULING ENDPOINTS
+// ============================================
+
+// Check slot availability with smart suggestions
+const checkSlotAvailability = async (req, res) => {
+    try {
+        const { doctorId, appointmentDate, appointmentTime, priority } = req.body;
+
+        if (!doctorId || !appointmentDate || !appointmentTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: doctorId, appointmentDate, appointmentTime'
+            });
+        }
+
+        const smartSchedulingService = require('../services/smartSchedulingService');
+        const result = await smartSchedulingService.validateAppointmentBooking(
+            doctorId,
+            appointmentDate,
+            appointmentTime,
+            priority || 'normal'
+        );
+
+        res.status(200).json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('Error checking slot availability:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error checking slot availability',
+            error: error.message
+        });
+    }
+};
+
+// Get available slots for a doctor on a specific day
+const getAvailableSlots = async (req, res) => {
+    try {
+        const { doctorId, date } = req.query;
+
+        if (!doctorId || !date) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: doctorId, date'
+            });
+        }
+
+        const smartSchedulingService = require('../services/smartSchedulingService');
+        const slots = await smartSchedulingService.getAvailableSlotsForDay(
+            doctorId,
+            new Date(date)
+        );
+
+        res.status(200).json({
+            success: true,
+            date,
+            availableSlots: slots,
+            count: slots.length
+        });
+    } catch (error) {
+        console.error('Error getting available slots:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting available slots',
+            error: error.message
+        });
+    }
+};
+
+// Get doctor's availability for multiple days
+const getDoctorAvailability = async (req, res) => {
+    try {
+        const { doctorId } = req.params;
+        const { days } = req.query;
+
+        if (!doctorId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required field: doctorId'
+            });
+        }
+
+        const smartSchedulingService = require('../services/smartSchedulingService');
+        const availability = await smartSchedulingService.getDoctorAvailability(
+            doctorId,
+            parseInt(days) || 7
+        );
+
+        res.status(200).json({
+            success: true,
+            doctorId,
+            availability
+        });
+    } catch (error) {
+        console.error('Error getting doctor availability:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting doctor availability',
+            error: error.message
+        });
+    }
+};
+
+// Find nearest available slot
+const findNearestSlot = async (req, res) => {
+    try {
+        const { doctorId, preferredDate, preferredTime, priority } = req.body;
+
+        if (!doctorId || !preferredDate || !preferredTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: doctorId, preferredDate, preferredTime'
+            });
+        }
+
+        const smartSchedulingService = require('../services/smartSchedulingService');
+        const result = await smartSchedulingService.findNearestAvailableSlot(
+            doctorId,
+            preferredDate,
+            preferredTime,
+            priority || 'normal'
+        );
+
+        res.status(200).json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('Error finding nearest slot:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error finding nearest slot',
             error: error.message
         });
     }

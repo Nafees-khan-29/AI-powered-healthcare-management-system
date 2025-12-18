@@ -29,6 +29,7 @@ import {
 } from 'react-icons/fa';
 import { getAllAppointments } from '../../../services/appointmentService';
 import { getAllDoctors, addDoctor, updateDoctor, deleteDoctor } from '../../../services/doctorService';
+import { getCriticalAlerts, acknowledgeAlert, respondToAlert, resolveAlert } from '../../../services/emergencyAlertService';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -45,6 +46,13 @@ const AdminDashboard = () => {
   const [doctors, setDoctors] = useState([]);
   const [filteredAppointments, setFilteredAppointments] = useState([]);
   const [filteredDoctors, setFilteredDoctors] = useState([]);
+
+  // Emergency Alerts state
+  const [emergencyAlerts, setEmergencyAlerts] = useState([]);
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
+  const [showAlertResponseModal, setShowAlertResponseModal] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [alertResponse, setAlertResponse] = useState('');
 
   // Doctor form state
   const [doctorForm, setDoctorForm] = useState({

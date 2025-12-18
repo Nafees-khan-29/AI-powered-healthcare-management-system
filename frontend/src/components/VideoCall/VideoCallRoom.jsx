@@ -23,6 +23,8 @@ const VideoCallRoom = ({
   patientData 
 }) => {
   const containerRef = useRef(null);
+  const zegoInstanceRef = useRef(null);
+  const hasInitialized = useRef(false);
   const [copied, setCopied] = useState(false);
   const [showLinkBanner, setShowLinkBanner] = useState(true);
   
@@ -38,7 +40,8 @@ const VideoCallRoom = ({
 
   useEffect(() => {
     const initializeZego = async () => {
-      if (!containerRef.current) return;
+      // Prevent multiple initializations
+      if (!containerRef.current || hasInitialized.current) return;
       try {
         console.log('🎥 Initializing ZegoCloud video call...');
         console.log('Room ID:', roomID);
@@ -72,6 +75,8 @@ const VideoCallRoom = ({
 
         // Create instance object from Kit Token
         const zp = ZegoUIKitPrebuilt.create(kitToken);
+        zegoInstanceRef.current = zp;
+        hasInitialized.current = true;
 
         // Join the room
         zp.joinRoom({
@@ -99,6 +104,8 @@ const VideoCallRoom = ({
           showLayoutButton: false,
           onLeaveRoom: () => {
             console.log('👋 User left the room');
+            hasInitialized.current = false;
+            zegoInstanceRef.current = null;
             if (onCallEnd) {
               onCallEnd();
             }
@@ -118,11 +125,19 @@ const VideoCallRoom = ({
       } catch (error) {
         console.error('❌ ZegoCloud initialization error:', error);
         console.error('Error details:', error.message);
+        hasInitialized.current = false;
       }
     };
 
     initializeZego();
-  }, [roomID, userID, userName, onCallEnd, roomLink]);
+
+    return () => {
+      // Cleanup only on unmount, not on re-renders
+      if (zegoInstanceRef.current) {
+        console.log('🧹 Cleaning up video call');
+      }
+    };
+  }, [roomID, userID, userName]);
 
   return (
     <div className="relative w-full h-screen">

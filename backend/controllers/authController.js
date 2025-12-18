@@ -251,3 +251,113 @@ export const checkRole = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get user details by email
+ */
+import userModel from '../models/userModel.js';
+
+export const getUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    console.log('🔍 Fetching user details for email:', email);
+
+    // Search in users collection
+    const user = await userModel.findOne({ email: email.toLowerCase() }).select('-password');
+
+    if (user) {
+      console.log('✅ User found in database:', user.name);
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          gender: user.gender,
+          dob: user.dob,
+          image: user.image,
+          address: user.address
+        }
+      });
+    }
+
+    // If not found in users, return not found
+    console.log('⚠️ User not found for email:', email);
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching user:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error fetching user',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Search user by name (case-insensitive partial match)
+ */
+export const searchUserByName = async (req, res) => {
+  try {
+    const { name } = req.query;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name is required'
+      });
+    }
+
+    console.log('🔍 Searching user by name:', name);
+
+    // Search in users collection (case-insensitive, partial match)
+    const user = await userModel.findOne({ 
+      name: { $regex: new RegExp(name, 'i') }
+    }).select('-password');
+
+    if (user) {
+      console.log('✅ User found by name search:', user.name, user.email);
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          gender: user.gender,
+          dob: user.dob,
+          image: user.image,
+          address: user.address
+        }
+      });
+    }
+
+    // If not found in users, return not found
+    console.log('⚠️ User not found for name:', name);
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+
+  } catch (error) {
+    console.error('❌ Error searching user:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error searching user',
+      error: error.message
+    });
+  }
+};

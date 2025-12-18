@@ -5,7 +5,8 @@ import {
     addDoctor,
     updateDoctor,
     deleteDoctor,
-    toggleAvailability
+    toggleAvailability,
+    sendPatientVideoCallLink
 } from '../controllers/doctorController.js';
 
 const doctorRouter = express.Router();
@@ -18,6 +19,9 @@ doctorRouter.get('/:id', getDoctorById);
 
 // POST /api/doctors/add - Add new doctor (admin only)
 doctorRouter.post('/add', addDoctor);
+
+// POST /api/doctors/send-video-link - Send video call link to patient
+doctorRouter.post('/send-video-link', sendPatientVideoCallLink);
 
 // PUT /api/doctors/:id - Update doctor info
 doctorRouter.put('/:id', updateDoctor);

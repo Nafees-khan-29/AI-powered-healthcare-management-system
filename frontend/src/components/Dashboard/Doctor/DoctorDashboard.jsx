@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { getDoctorAppointments, updateAppointmentStatus, cancelAppointment } from '../../../services/appointmentService';
-import { createMedicalRecord, getDoctorMedicalRecords, createPrescription, getDoctorPrescriptions, updateMedicalRecord, deleteMedicalRecord } from '../../../services/medicalRecordService';
+import { createMedicalRecord, getDoctorMedicalRecords, createPrescription, getDoctorPrescriptions, updateMedicalRecord, deleteMedicalRecord, deletePrescription } from '../../../services/medicalRecordService';
+import { getDoctorAlerts, acknowledgeAlert, resolveAlert, deleteAlert, sendVideoCallLink } from '../../../services/emergencyAlertService';
+import { sendPatientVideoCallLink } from '../../../services/doctorService';
+import { getUserByEmail } from '../../../services/userService';
 import Navbar from '../../Hero-com/Navbar';
 import VideoCallRoom from '../../VideoCall/VideoCallRoom';
 import {
@@ -40,7 +43,8 @@ import {
   FaTimes,
   FaVideo,
   FaPhoneAlt,
-  FaComments
+  FaComments,
+  FaPhoneSlash
 } from 'react-icons/fa';
 import './DoctorDashboard.css';
 
@@ -132,6 +136,22 @@ const MedicalReportForm = ({ onClose, onSave, initialData = null, user, isLoaded
     setEditingIndex(null);
   };
 
+  const removePrescription = (index) => {
+    if (window.confirm('Are you sure you want to remove this prescription?')) {
+      setFormData(prev => ({
+        ...prev,
+        prescriptions: prev.prescriptions.filter((_, i) => i !== index)
+      }));
+      // If we're editing this prescription, cancel the edit
+      if (editingIndex === index) {
+        cancelEditing();
+      } else if (editingIndex > index) {
+        // Adjust editing index if it's after the removed item
+        setEditingIndex(editingIndex - 1);
+      }
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -168,8 +188,15 @@ const MedicalReportForm = ({ onClose, onSave, initialData = null, user, isLoaded
       return;
     }
 
+    // Auto-add pending prescription if fields are filled but not yet added
+    let finalPrescriptions = [...formData.prescriptions];
+    if (newPrescription.medication && newPrescription.dosage && editingIndex === null) {
+      finalPrescriptions.push({ ...newPrescription });
+    }
+
     const reportData = {
       ...formData,
+      prescriptions: finalPrescriptions,
       doctorEmail,
       doctorName,
       status: 'active',
@@ -562,6 +589,23 @@ const MedicalReportForm = ({ onClose, onSave, initialData = null, user, isLoaded
   );
 };
 
+// Helper function to calculate age from date of birth
+const calculateAge = (dob) => {
+  if (!dob) return 'N/A';
+  try {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age > 0 ? age : 'N/A';
+  } catch (error) {
+    return 'N/A';
+  }
+};
+
 const DoctorDashboard = () => {
   const { user, isLoaded } = useUser();
   const [activeTab, setActiveTab] = useState('overview');
@@ -604,6 +648,14 @@ const DoctorDashboard = () => {
   const [isLoadingMedicalRecords, setIsLoadingMedicalRecords] = useState(false);
   const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
 
+  // State for emergency alerts
+  const [emergencyAlerts, setEmergencyAlerts] = useState([]);
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState(null);
+
+  // State for emergency video call
+  const [showVideoCall, setShowVideoCall] = useState(false);
+
   // Fetch appointments function (extracted for manual refresh)
   const fetchAppointments = async () => {
     if (!user?.id || !isLoaded) return;
@@ -635,7 +687,8 @@ const DoctorDashboard = () => {
             patientId: apt._id.substring(0, 8).toUpperCase(),
             date: apt.appointmentDate,
             time: apt.appointmentTime,
-            type: 'Consultation',
+            type: apt.consultationType === 'online' ? 'Online Consultation' : 'Offline Consultation',
+            consultationType: apt.consultationType || 'offline',
             status: apt.status,
             priority: apt.status === 'urgent' ? 'critical' : apt.status === 'confirmed' ? 'high' : 'medium',
             symptoms: apt.symptoms || 'Not specified',
@@ -648,11 +701,12 @@ const DoctorDashboard = () => {
         
         console.log('✅ Transformed appointments:', transformedAppointments);
         console.log('📝 Statuses:', transformedAppointments.map(a => `${a.patientName}: ${a.status}`));
+        console.log('📧 Patient emails in appointments:', transformedAppointments.map(a => `${a.patientName}: ${a.email || 'NO EMAIL'}`));
         
         setAppointments(transformedAppointments);
 
-        // Compute real-time data from appointments
-        computeRealTimeData(transformedAppointments);
+        // Compute real-time data from appointments (with user enrichment)
+        await computeRealTimeData(transformedAppointments);
       } else {
         setError(result.message || 'Failed to load appointments');
       }
@@ -667,7 +721,103 @@ const DoctorDashboard = () => {
   // Fetch appointments when component mounts or user changes
   useEffect(() => {
     fetchAppointments();
+    fetchEmergencyAlerts();
   }, [user, isLoaded]);
+
+  // Fetch emergency alerts
+  const fetchEmergencyAlerts = async () => {
+    if (!user?.id || !isLoaded) return;
+    
+    setIsLoadingAlerts(true);
+    try {
+      console.log('📥 Fetching emergency alerts for doctor:', user.id);
+      const response = await getDoctorAlerts(user.id);
+      console.log('✅ Emergency alerts response:', response);
+      
+      if (response.success) {
+        setEmergencyAlerts(response.alerts);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching emergency alerts:', error);
+    } finally {
+      setIsLoadingAlerts(false);
+    }
+  };
+
+  // Handle acknowledge alert
+  const handleAcknowledgeAlert = async (alertId) => {
+    try {
+      await acknowledgeAlert(alertId, user.id, user.fullName);
+      alert('Alert acknowledged successfully');
+      fetchEmergencyAlerts();
+    } catch (error) {
+      alert('Failed to acknowledge alert: ' + error.message);
+    }
+  };
+
+  // Handle respond to alert
+
+
+  // Handle resolve alert
+  const handleResolveAlert = async (alertId) => {
+    if (!window.confirm('Mark this emergency alert as resolved?')) {
+      return;
+    }
+
+    try {
+      await resolveAlert(alertId);
+      alert('Alert resolved successfully');
+      fetchEmergencyAlerts();
+    } catch (error) {
+      alert('Failed to resolve alert: ' + error.message);
+    }
+  };
+
+  // Handle delete alert
+  const handleDeleteAlert = async (alertId) => {
+    if (!window.confirm('Are you sure you want to delete this emergency alert? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteAlert(alertId);
+      alert('✅ Emergency alert deleted successfully');
+      fetchEmergencyAlerts();
+    } catch (error) {
+      alert('Failed to delete alert: ' + error.message);
+    }
+  };
+
+  // Handle video call with patient
+  const handleVideoCallWithPatient = async (emergencyAlert) => {
+    try {
+      const roomID = `emergency_${emergencyAlert._id}_${Date.now()}`;
+      const videoCallLink = `${window.location.origin}/video-call?roomID=${roomID}`;
+      
+      // Send video call link to patient via email
+      await sendVideoCallLink(emergencyAlert._id, videoCallLink, user.fullName || 'Doctor');
+      
+      // Show success message
+      alert(`✅ Video call link sent to ${emergencyAlert.patientName} at ${emergencyAlert.patientEmail}`);
+      
+      // Set up video call data and show video call
+      setVideoCallData({
+        roomID,
+        userID: user.id,
+        userName: user.fullName || 'Doctor',
+        patientData: {
+          patientName: emergencyAlert.patientName,
+          patientPhone: emergencyAlert.patientPhone,
+          emergencyType: emergencyAlert.emergencyType,
+          severity: emergencyAlert.severity
+        }
+      });
+      setShowVideoCall(true);
+    } catch (error) {
+      console.error('Error initiating video call:', error);
+      alert('Failed to send video call link. Please try again.');
+    }
+  };
 
   // Listen for appointment update events (for real-time UI updates)
   useEffect(() => {
@@ -767,71 +917,116 @@ const DoctorDashboard = () => {
 
   // Handle appointment cancellation/deletion
   const handleCancelAppointment = async (appointmentId) => {
+    console.log('🗑️ handleCancelAppointment called with ID:', appointmentId);
+    
+    if (!appointmentId) {
+      alert('Cannot cancel appointment: Invalid appointment ID');
+      console.error('❌ No appointment ID provided');
+      return;
+    }
+    
     if (!window.confirm('Are you sure you want to cancel this appointment?')) {
       return;
     }
 
     try {
+      console.log('📞 Calling cancelAppointment API with ID:', appointmentId);
       const result = await cancelAppointment(appointmentId, 'Cancelled by doctor');
+      console.log('📥 Cancel appointment result:', result);
       
       if (result.success) {
         // Remove the appointment from the local state
         setAppointments(prevAppointments =>
           prevAppointments.filter(apt => apt.id !== appointmentId)
         );
+        
+        // Refresh appointments to update medical records
+        fetchAppointments();
+        
         alert('Appointment cancelled successfully');
       } else {
         alert(result.message || 'Failed to cancel appointment');
       }
     } catch (err) {
-      console.error('Error cancelling appointment:', err);
-      alert('An error occurred while cancelling the appointment');
+      console.error('❌ Error cancelling appointment:', err);
+      alert(`An error occurred while cancelling the appointment: ${err.message}`);
     }
   };
 
   // Function to compute real-time data from appointments
-  const computeRealTimeData = (appointmentsData) => {
+  const computeRealTimeData = async (appointmentsData) => {
     console.log('🔄 Computing real-time data from appointments...');
 
-    // Compute unique patients
+    // Filter only confirmed appointments for patients section
+    const confirmedAppointments = appointmentsData.filter(apt => 
+      apt.status === 'confirmed' || apt.status === 'booked'
+    );
+    console.log(`✅ Filtering patients: ${confirmedAppointments.length} confirmed appointments out of ${appointmentsData.length} total`);
+
+    // Compute unique patients - use data directly from confirmed appointments only
     const uniquePatients = {};
-    appointmentsData.forEach(apt => {
-      const key = apt.patientEmail || apt.patientName;
+    confirmedAppointments.forEach(apt => {
+      // Use email and phone directly from transformed appointment data
+      const patientEmail = apt.email || 'N/A';
+      const patientPhone = apt.phone || 'N/A';
+      const patientAge = apt.age || 'N/A';
+      const patientGender = apt.gender || 'N/A';
+      
+      console.log(`📋 Appointment data for ${apt.patientName}:`, {
+        email: patientEmail,
+        phone: patientPhone,
+        age: patientAge,
+        gender: patientGender
+      });
+      
+      const key = patientEmail !== 'N/A' ? patientEmail : apt.patientName;
       if (!uniquePatients[key]) {
         uniquePatients[key] = {
           id: apt.patientId,
           name: apt.patientName,
-          age: apt.patientAge || 'N/A',
-          gender: apt.patientGender || 'N/A',
-          phone: apt.patientPhone || 'N/A',
-          email: apt.patientEmail || 'N/A',
-          lastVisit: apt.appointmentDate,
-          nextAppointment: null, // Could be enhanced to find next appointment
+          age: patientAge,
+          gender: patientGender,
+          phone: patientPhone,
+          email: patientEmail,
+          consultationType: apt.consultationType || 'offline',
+          lastVisit: apt.date,
+          nextAppointment: null,
           status: 'active',
-          medicalHistory: [], // Empty for now, could be enhanced
-          emergencyContact: '' // Empty for now
+          medicalHistory: [],
+          emergencyContact: ''
         };
       }
     });
     const patientsArray = Object.values(uniquePatients);
+    
+    console.log('📊 Computed patients from appointments:', patientsArray.length);
+    patientsArray.forEach(p => {
+      console.log(`  ✅ ${p.name}: email=${p.email}, phone=${p.phone}, age=${p.age}, gender=${p.gender}`);
+    });
+    
+    // Use patient data directly from appointments (already has email, phone, age, gender)
     setRealPatients(patientsArray);
-    console.log('✅ Computed real patients:', patientsArray.length);
+    console.log('✅ Computed real patients from appointment data:', patientsArray.length);
 
     // Compute medical records from appointments
-    const medicalRecordsArray = appointmentsData.map(apt => ({
-      id: apt._id,
-      patientName: apt.patientName,
-      patientId: apt.patientId,
-      date: apt.appointmentDate,
-      diagnosis: apt.symptoms || 'Appointment scheduled',
-      symptoms: apt.symptoms || 'Not specified',
-      treatment: 'To be determined during consultation',
-      notes: `Appointment ${apt.status} - ${apt.symptoms || 'No additional notes'}`,
-      followUp: null, // Could be enhanced
-      status: apt.status === 'completed' ? 'resolved' : 'active'
-    }));
+    const medicalRecordsArray = appointmentsData.map(apt => {
+      const record = {
+        id: apt.id || apt._id,  // Use apt.id (which is from transformed appointment) or apt._id
+        patientName: apt.patientName,
+        patientId: apt.patientId,
+        date: apt.date || apt.appointmentDate,
+        diagnosis: apt.symptoms || 'Appointment scheduled',
+        symptoms: apt.symptoms || 'Not specified',
+        treatment: 'To be determined during consultation',
+        notes: `Appointment ${apt.status} - ${apt.symptoms || 'No additional notes'}`,
+        followUp: null, // Could be enhanced
+        status: apt.status === 'completed' ? 'resolved' : 'active'
+      };
+      return record;
+    });
     setRealMedicalRecords(medicalRecordsArray);
     console.log('✅ Computed medical records:', medicalRecordsArray.length);
+    console.log('📋 Sample medical record:', medicalRecordsArray[0]);
 
     // For prescriptions, we'll keep dummy data for now as there's no prescription system yet
     // In a real system, prescriptions would be a separate collection
@@ -993,10 +1188,11 @@ const DoctorDashboard = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FaUserMd },
     { id: 'appointments', label: 'Appointments', icon: FaCalendarAlt },
-    { id: 'patients', label: 'Patients', icon: FaUsers },
+    { id: 'patients', label: 'Online Patients', icon: FaUsers },
     { id: 'medical-records', label: 'Medical Records', icon: FaFileMedical },
     { id: 'medical-reports', label: 'Medical Reports', icon: FaNotesMedical },
     { id: 'prescriptions', label: 'Prescriptions', icon: FaPills },
+    { id: 'emergency-alerts', label: 'Emergency Alerts', icon: FaBell },
     // { id: 'analytics', label: 'Analytics', icon: FaChartLine }
   ];
 
@@ -1057,7 +1253,7 @@ const DoctorDashboard = () => {
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="stat-card">
+        <div key="stat-patients" className="stat-card">
           <div className="stat-icon bg-blue-500">
             <FaUsers className="text-white" />
           </div>
@@ -1068,7 +1264,7 @@ const DoctorDashboard = () => {
           </div>
         </div>
 
-        <div className="stat-card">
+        <div key="stat-appointments" className="stat-card">
           <div className="stat-icon bg-green-500">
             <FaCalendarAlt className="text-white" />
           </div>
@@ -1079,7 +1275,7 @@ const DoctorDashboard = () => {
           </div>
         </div>
 
-        <div className="stat-card">
+        <div key="stat-pending" className="stat-card">
           <div className="stat-icon bg-yellow-500">
             <FaClock className="text-white" />
           </div>
@@ -1090,7 +1286,7 @@ const DoctorDashboard = () => {
           </div>
         </div>
 
-        <div className="stat-card">
+        <div key="stat-critical" className="stat-card">
           <div className="stat-icon bg-red-500">
             <FaExclamationTriangle className="text-white" />
           </div>
@@ -1123,10 +1319,10 @@ const DoctorDashboard = () => {
                 <h4 className="font-medium text-gray-900">{appointment.patientName}</h4>
                 <p className="text-sm text-gray-600">{appointment.type}</p>
                 <div className="flex items-center space-x-2 mt-1">
-                  <span className={`status-badge ${getStatusBadge(appointment.status)}`}>
+                  <span key={`status-${appointment.id}`} className={`status-badge ${getStatusBadge(appointment.status)}`}>
                     {appointment.status}
                   </span>
-                  <span className={`priority-badge ${getPriorityBadge(appointment.priority)}`}>
+                  <span key={`priority-${appointment.id}`} className={`priority-badge ${getPriorityBadge(appointment.priority)}`}>
                     {appointment.priority}
                   </span>
                 </div>
@@ -1365,34 +1561,112 @@ const DoctorDashboard = () => {
   // Render Patients Section with Contact Information
   const renderPatients = () => {
     const filteredPatients = realPatients.filter(patient => 
-      patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.phone?.toLowerCase().includes(searchQuery.toLowerCase())
+      patient.consultationType === 'online' && (
+        patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patient.phone?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     );
 
-    const initiateVideoCall = (patient) => {
-      // Generate room ID based on patient and doctor info
-      const roomID = `consultation_${patient.id}_${Date.now()}`;
-      
-      // Set up video call data
-      const callData = {
-        roomID,
-        userID: user.id,
-        userName: `Dr. ${user.firstName} ${user.lastName}`,
-        patientData: {
-          name: patient.name,
-          email: patient.email,
-          phone: patient.phone,
-          age: patient.age,
-          gender: patient.gender
+    const initiateVideoCall = async (patient) => {
+      try {
+        console.log('🎥 Starting video call initiation for patient:', patient.name);
+        
+        // Generate room ID based on patient and doctor info
+        const roomID = `consultation_${patient.id}_${Date.now()}`;
+        const videoCallLink = `${window.location.origin}/video-call?roomID=${roomID}`;
+        const doctorName = `Dr. ${user.firstName} ${user.lastName}`;
+        
+        console.log('📧 Patient email:', patient.email);
+        console.log('🔗 Video call link:', videoCallLink);
+        
+        // Send video call link to patient via email
+        if (patient.email && patient.email !== 'N/A') {
+          console.log('📤 Attempting to send video call link email...');
+          console.log('📧 To:', patient.email);
+          console.log('👤 Patient:', patient.name);
+          console.log('👨‍⚕️ Doctor:', doctorName);
+          console.log('🔗 Link:', videoCallLink);
+          
+          try {
+            console.log('🚀 Calling sendPatientVideoCallLink API...');
+            const emailResult = await sendPatientVideoCallLink(
+              patient.email,
+              patient.name,
+              videoCallLink,
+              doctorName
+            );
+            
+            console.log('✅ Email API response:', emailResult);
+            
+            if (emailResult.success) {
+              alert(`✅ Video call link sent successfully!\n\nPatient: ${patient.name}\nEmail: ${patient.email}\n\nThe patient will receive an email with the video call link.`);
+            } else {
+              throw new Error(emailResult.message || 'Unknown error');
+            }
+          } catch (emailError) {
+            console.error('❌ Failed to send email:', emailError);
+            console.error('❌ Error stack:', emailError.stack);
+            alert(`⚠️ Failed to send email to ${patient.email}\n\nError: ${emailError.message}\n\nYou can still proceed with the video call, but the patient won't receive an email notification.`);
+          }
+        } else {
+          console.warn('⚠️ No valid email address for patient:', patient.name);
+          const shouldProceed = confirm(
+            `⚠️ No Email Address Available\n\n` +
+            `Patient "${patient.name}" doesn't have a valid email address registered.\n\n` +
+            `The video call link cannot be sent via email.\n\n` +
+            `Video Call Link:\n${videoCallLink}\n\n` +
+            `Do you want to:\n` +
+            `• Copy the link and send it manually (WhatsApp, SMS, etc.)\n` +
+            `• Proceed with the video call anyway\n\n` +
+            `Click OK to copy the link and proceed, or Cancel to abort.`
+          );
+          
+          if (shouldProceed) {
+            // Copy link to clipboard
+            try {
+              await navigator.clipboard.writeText(videoCallLink);
+              alert(`✅ Video call link copied to clipboard!\n\nYou can now share it with ${patient.name} via WhatsApp, SMS, or other messaging apps.`);
+            } catch (clipboardError) {
+              console.error('Failed to copy to clipboard:', clipboardError);
+              alert(`Video call link:\n${videoCallLink}\n\nPlease copy this link manually and share it with the patient.`);
+            }
+          } else {
+            // User cancelled, don't proceed with video call
+            return;
+          }
         }
-      };
-      
-      console.log('🎥 Initiating video call:', callData);
-      
-      // Start video call
-      setVideoCallData(callData);
-      setActiveVideoCall(true);
+        
+        // Set up video call data
+        const callData = {
+          roomID,
+          userID: user.id,
+          userName: doctorName,
+          patientData: {
+            name: patient.name,
+            email: patient.email,
+            phone: patient.phone,
+            age: patient.age,
+            gender: patient.gender
+          }
+        };
+        
+        console.log('🎥 Initiating video call with data:', callData);
+        
+        // Start video call and scroll to top
+        setVideoCallData(callData);
+        setActiveVideoCall(true);
+        
+        // Smooth scroll to top to show video call
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      } catch (error) {
+        console.error('❌ Error initiating video call:', error);
+        console.error('❌ Error details:', error.message);
+        alert(`Failed to send video call link: ${error.message}`);
+      }
     };
 
     const initiatePhoneCall = (patient) => {
@@ -1427,7 +1701,7 @@ const DoctorDashboard = () => {
           </div>
           <div className="flex gap-4 items-center">
             <div className="text-sm text-gray-600">
-              Total Patients: <span className="font-bold text-blue-600">{realPatients.length}</span>
+              Total Online Patients: <span className="font-bold text-blue-600">{realPatients.filter(p => p.consultationType === 'online').length}</span>
             </div>
           </div>
         </div>
@@ -1436,7 +1710,7 @@ const DoctorDashboard = () => {
         {filteredPatients.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <FaUsers className="mx-auto text-6xl text-gray-300 mb-4" />
-            <p className="text-gray-500 text-lg">No patients found</p>
+            <p className="text-gray-500 text-lg">No online consultation patients found</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1468,6 +1742,16 @@ const DoctorDashboard = () => {
                     <div>
                       <p className="text-gray-500 font-medium">Gender</p>
                       <p className="text-gray-900 font-semibold">{patient.gender}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-gray-500 font-medium">Type</p>
+                      <p className={`font-semibold mt-1 ${
+                        patient.consultationType === 'online' 
+                          ? 'text-green-700' 
+                          : 'text-blue-700'
+                      }`}>
+                        {patient.consultationType === 'online' ? '🌐 Online Consultation' : '🏥 Offline Consultation'}
+                      </p>
                     </div>
                   </div>
 
@@ -1513,14 +1797,21 @@ const DoctorDashboard = () => {
                   <div className="border-t pt-4 space-y-2">
                     <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Quick Actions</h4>
                     
-                    {/* Video Call Button */}
-                    <button
-                      onClick={() => initiateVideoCall(patient)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
-                    >
-                      <FaVideo className="text-lg" />
-                      Start Video Call
-                    </button>
+                    {/* Video Call Button - Only for Online Consultations */}
+                    {patient.consultationType === 'online' ? (
+                      <button
+                        onClick={() => initiateVideoCall(patient)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg font-semibold"
+                      >
+                        <FaVideo className="text-lg" />
+                        Start Video Call
+                      </button>
+                    ) : (
+                      <div className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gray-100 text-gray-600 border-2 border-dashed border-gray-300">
+                        <FaVideo className="text-lg" />
+                        <span className="font-medium">In-Person Consultation</span>
+                      </div>
+                    )}
 
                     {/* Phone and Email Buttons */}
                     <div className="grid grid-cols-2 gap-2">
@@ -1587,7 +1878,10 @@ const DoctorDashboard = () => {
           />
         </div>
 
-        <button className="btn-primary">
+        <button 
+          onClick={() => openModal('create-medical-report')}
+          className="btn-primary"
+        >
           <FaPlus className="mr-2" />
           New Record
         </button>
@@ -1664,9 +1958,27 @@ const DoctorDashboard = () => {
                     <FaEdit className="mr-1" />
                     Edit
                   </button>
-                  <button className="btn-secondary btn-sm">
+                  <button 
+                    onClick={() => handlePrintMedicalRecord(record)}
+                    className="btn-secondary btn-sm"
+                  >
                     <FaPrint className="mr-1" />
                     Print
+                  </button>
+                  <button 
+                    onClick={() => {
+                      console.log('🗑️ Delete clicked for record:', { id: record.id, _id: record._id, record });
+                      if (!record.id && !record._id) {
+                        alert('Cannot delete: Invalid record ID');
+                        return;
+                      }
+                      handleCancelAppointment(record.id || record._id);
+                    }}
+                    className="btn-danger btn-sm"
+                    title="Cancel Appointment"
+                  >
+                    <FaTrash className="mr-1" />
+                    Delete
                   </button>
                 </div>
               </div>
@@ -1676,6 +1988,500 @@ const DoctorDashboard = () => {
       </div>
     </div>
   );
+
+  // Print medical record function
+  const handlePrintMedicalRecord = (record) => {
+    const doctorName = `Dr. ${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+    const printWindow = window.open('', '_blank');
+    
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Medical Record - ${record.patientName}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .header h1 {
+            color: #2563eb;
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 5px 0;
+            color: #666;
+          }
+          .patient-info {
+            background: #f9fafb;
+            border-left: 4px solid #2563eb;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+          }
+          .patient-info h3 {
+            color: #2563eb;
+            margin-top: 0;
+          }
+          .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+          }
+          .info-row {
+            margin-bottom: 8px;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #555;
+            margin-right: 8px;
+          }
+          .section {
+            margin: 25px 0;
+            padding: 20px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+          }
+          .section h3 {
+            color: #2563eb;
+            margin-top: 0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .section-icon {
+            font-size: 20px;
+          }
+          .section-content {
+            color: #374151;
+            line-height: 1.6;
+          }
+          .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+          }
+          .status-active {
+            background: #dcfce7;
+            color: #166534;
+          }
+          .status-completed {
+            background: #dbeafe;
+            color: #1e40af;
+          }
+          .footer {
+            margin-top: 40px;
+            border-top: 2px solid #e5e7eb;
+            padding-top: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          .signature-section {
+            margin-top: 60px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .signature {
+            text-align: center;
+          }
+          .signature-line {
+            border-top: 2px solid #333;
+            width: 250px;
+            margin: 10px auto 5px;
+          }
+          @media print {
+            body {
+              padding: 20px;
+            }
+            button {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🏥 ${doctorName}</h1>
+          <p>Medical Record Report</p>
+          <p>Date: ${new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}</p>
+        </div>
+
+        <div class="patient-info">
+          <h3>Patient Information</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="info-label">Patient Name:</span>
+              <span>${record.patientName}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Patient ID:</span>
+              <span>${record.patientId}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Date:</span>
+              <span>${record.date}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Status:</span>
+              <span class="status-badge status-${record.status || 'active'}">${(record.status || 'active').toUpperCase()}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3><span class="section-icon">🩺</span> Diagnosis</h3>
+          <div class="section-content">${record.diagnosis}</div>
+        </div>
+
+        <div class="section">
+          <h3><span class="section-icon">📋</span> Symptoms</h3>
+          <div class="section-content">${record.symptoms}</div>
+        </div>
+
+        <div class="section">
+          <h3><span class="section-icon">💊</span> Treatment</h3>
+          <div class="section-content">${record.treatment}</div>
+        </div>
+
+        ${record.notes ? `
+          <div class="section">
+            <h3><span class="section-icon">📝</span> Additional Notes</h3>
+            <div class="section-content">${record.notes}</div>
+          </div>
+        ` : ''}
+
+        ${record.followUp ? `
+          <div class="section">
+            <h3><span class="section-icon">📅</span> Follow-up</h3>
+            <div class="section-content">${record.followUp}</div>
+          </div>
+        ` : ''}
+
+        <div class="signature-section">
+          <div class="signature">
+            <div class="signature-line"></div>
+            <p style="margin: 5px 0;">Doctor's Signature</p>
+            <p style="font-size: 12px; color: #666;">${doctorName}</p>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <p style="margin: 5px 0;">Date</p>
+            <p style="font-size: 12px; color: #666;">${new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>Confidential Medical Record</strong></p>
+          <p>This document contains confidential patient information protected by medical privacy laws.</p>
+          <p style="margin-top: 15px; color: #999;">Generated on ${new Date().toLocaleString()}</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+          <button onclick="window.print()" style="
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+          ">
+            🖨️ Print Record
+          </button>
+          <button onclick="window.close()" style="
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+          ">
+            ✖️ Close
+          </button>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  };
+
+  // Print prescription function
+  const handlePrintPrescription = (prescription) => {
+    const doctorName = `Dr. ${user?.firstName || ''} ${user?.lastName || ''}`.trim();
+    const printWindow = window.open('', '_blank');
+    
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Prescription - ${prescription.patientName}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .header h1 {
+            color: #2563eb;
+            margin: 0;
+            font-size: 28px;
+          }
+          .header p {
+            margin: 5px 0;
+            color: #666;
+          }
+          .prescription-box {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 20px 0;
+            background: #f9fafb;
+          }
+          .patient-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+          }
+          .info-row {
+            margin-bottom: 10px;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #555;
+            margin-right: 8px;
+          }
+          .prescription-details {
+            background: white;
+            border-left: 4px solid #2563eb;
+            padding: 20px;
+            margin: 20px 0;
+          }
+          .prescription-details h3 {
+            color: #2563eb;
+            margin-top: 0;
+            margin-bottom: 15px;
+          }
+          .detail-row {
+            margin: 12px 0;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          .detail-row:last-child {
+            border-bottom: none;
+          }
+          .instructions {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+          }
+          .instructions h4 {
+            color: #f59e0b;
+            margin-top: 0;
+          }
+          .footer {
+            margin-top: 40px;
+            border-top: 2px solid #e5e7eb;
+            padding-top: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+          }
+          .signature-section {
+            margin-top: 60px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .signature {
+            text-align: center;
+          }
+          .signature-line {
+            border-top: 2px solid #333;
+            width: 250px;
+            margin: 10px auto 5px;
+          }
+          @media print {
+            body {
+              padding: 20px;
+            }
+            button {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🏥 ${doctorName}</h1>
+          <p>Healthcare Professional</p>
+          <p>Date: ${new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}</p>
+        </div>
+
+        <div class="patient-info">
+          <div class="info-row">
+            <span class="info-label">Patient Name:</span>
+            <span>${prescription.patientName}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Patient ID:</span>
+            <span>${prescription.patientId}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Date Prescribed:</span>
+            <span>${new Date(prescription.date || Date.now()).toLocaleDateString()}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Prescription ID:</span>
+            <span>${prescription._id}</span>
+          </div>
+        </div>
+
+        <div class="prescription-box">
+          <div class="prescription-details">
+            <h3>📋 Prescription Details</h3>
+            
+            <div class="detail-row">
+              <span class="info-label">Medication:</span>
+              <span style="font-size: 18px; font-weight: bold; color: #2563eb;">${prescription.medication}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="info-label">Dosage:</span>
+              <span style="font-size: 16px; color: #059669;">${prescription.dosage}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="info-label">Duration:</span>
+              <span>${prescription.duration}</span>
+            </div>
+            
+            <div class="detail-row">
+              <span class="info-label">Refills Remaining:</span>
+              <span>${prescription.refills || 0}</span>
+            </div>
+            
+            ${prescription.frequency ? `
+              <div class="detail-row">
+                <span class="info-label">Frequency:</span>
+                <span>${prescription.frequency}</span>
+              </div>
+            ` : ''}
+            
+            ${prescription.pharmacy ? `
+              <div class="detail-row">
+                <span class="info-label">Pharmacy:</span>
+                <span>${prescription.pharmacy}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          ${prescription.instructions ? `
+            <div class="instructions">
+              <h4>⚠️ Important Instructions</h4>
+              <p>${prescription.instructions}</p>
+            </div>
+          ` : ''}
+
+          ${prescription.notes ? `
+            <div style="margin-top: 20px; padding: 15px; background: #eff6ff; border-radius: 8px;">
+              <strong>Additional Notes:</strong>
+              <p style="margin: 10px 0 0 0;">${prescription.notes}</p>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="signature-section">
+          <div class="signature">
+            <div class="signature-line"></div>
+            <p style="margin: 5px 0;">Doctor's Signature</p>
+            <p style="font-size: 12px; color: #666;">${doctorName}</p>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <p style="margin: 5px 0;">Date</p>
+            <p style="font-size: 12px; color: #666;">${new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>⚠️ Important:</strong> This prescription is valid only when accompanied by the doctor's signature.</p>
+          <p>Please consult your doctor if you experience any adverse effects.</p>
+          <p style="margin-top: 15px; color: #999;">This is a computer-generated prescription.</p>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+          <button onclick="window.print()" style="
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+          ">
+            🖨️ Print Prescription
+          </button>
+          <button onclick="window.close()" style="
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+          ">
+            ✖️ Close
+          </button>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  };
 
   const renderPrescriptions = () => (
     <div className="space-y-6">
@@ -1692,7 +2498,10 @@ const DoctorDashboard = () => {
           />
         </div>
 
-        <button className="btn-primary">
+        <button 
+          onClick={() => openModal('create-medical-report')}
+          className="btn-primary"
+        >
           <FaPlus className="mr-2" />
           New Prescription
         </button>
@@ -1714,17 +2523,24 @@ const DoctorDashboard = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {realPrescriptions.length === 0 ? (
+              {isLoadingPrescriptions ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-12 text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-gray-600">Loading prescriptions...</p>
+                  </td>
+                </tr>
+              ) : doctorPrescriptions.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-6 py-12 text-center">
                     <FaPills className="text-5xl mx-auto mb-4 text-gray-300" />
                     <p className="text-gray-500 text-lg mb-2">No prescriptions found</p>
-                    <p className="text-gray-400 text-sm">Prescription system not yet implemented</p>
+                    <p className="text-gray-400 text-sm">Create prescriptions through medical reports</p>
                   </td>
                 </tr>
               ) : (
-                realPrescriptions.map(prescription => (
-                  <tr key={prescription.id} className="hover:bg-gray-50">
+                doctorPrescriptions.map(prescription => (
+                  <tr key={prescription._id} className="hover:bg-gray-50">
                     <td className="table-cell">
                       <div className="patient-info">
                         <div className="patient-avatar">
@@ -1738,7 +2554,7 @@ const DoctorDashboard = () => {
                     </td>
                     <td className="table-cell">
                       <div className="text-sm text-gray-900">{prescription.medication}</div>
-                      <div className="text-sm text-gray-500">{prescription.pharmacy}</div>
+                      {prescription.pharmacy && <div className="text-sm text-gray-500">{prescription.pharmacy}</div>}
                     </td>
                     <td className="table-cell">
                       <span className="prescription-dosage">{prescription.dosage}</span>
@@ -1747,11 +2563,11 @@ const DoctorDashboard = () => {
                       <span className="prescription-duration">{prescription.duration}</span>
                     </td>
                     <td className="table-cell">
-                      <span className="prescription-refills">{prescription.refills}</span>
+                      <span className="prescription-refills">{prescription.refills || 0}</span>
                     </td>
                     <td className="table-cell">
-                      <span className={`status-badge ${getStatusBadge(prescription.status)}`}>
-                        {prescription.status}
+                      <span className={`status-badge ${getStatusBadge(prescription.status || 'active')}`}>
+                        {prescription.status || 'active'}
                       </span>
                     </td>
                     <td className="table-cell">
@@ -1770,8 +2586,19 @@ const DoctorDashboard = () => {
                         >
                           <FaEdit />
                         </button>
-                        <button className="btn-icon btn-secondary btn-sm" title="Print">
+                        <button 
+                          onClick={() => handlePrintPrescription(prescription)}
+                          className="btn-icon btn-secondary btn-sm" 
+                          title="Print Prescription"
+                        >
                           <FaPrint />
+                        </button>
+                        <button 
+                          onClick={() => handleDeletePrescription(prescription._id)}
+                          className="btn-icon btn-danger btn-sm" 
+                          title="Delete Prescription"
+                        >
+                          <FaTrash />
                         </button>
                       </div>
                     </td>
@@ -1909,7 +2736,229 @@ const DoctorDashboard = () => {
     </div>
   );
 
- 
+  const renderEmergencyAlerts = () => {
+    const pendingAlerts = emergencyAlerts.filter(a => a.status === 'pending' || a.status === 'acknowledged');
+    const resolvedAlerts = emergencyAlerts.filter(a => a.status === 'resolved');
+    
+    const getSeverityColor = (severity) => {
+      switch (severity) {
+        case 'critical': return 'bg-red-100 text-red-800 border-red-300';
+        case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
+        case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+        case 'low': return 'bg-blue-100 text-blue-800 border-blue-300';
+        default: return 'bg-gray-100 text-gray-800 border-gray-300';
+      }
+    };
+
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'pending': return 'bg-red-100 text-red-800';
+        case 'acknowledged': return 'bg-yellow-100 text-yellow-800';
+        case 'responded': return 'bg-blue-100 text-blue-800';
+        case 'resolved': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-600 text-sm font-medium">Pending</p>
+                <p className="text-3xl font-bold text-red-700">{pendingAlerts.length}</p>
+              </div>
+              <FaExclamationCircle className="text-4xl text-red-400" />
+            </div>
+          </div>
+          
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-600 text-sm font-medium">Critical</p>
+                <p className="text-3xl font-bold text-orange-700">
+                  {emergencyAlerts.filter(a => a.severity === 'critical' && a.status !== 'resolved').length}
+                </p>
+              </div>
+              <FaExclamationTriangle className="text-4xl text-orange-400" />
+            </div>
+          </div>
+          
+          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-600 text-sm font-medium">Resolved</p>
+                <p className="text-3xl font-bold text-green-700">{resolvedAlerts.length}</p>
+              </div>
+              <FaCheckCircle className="text-4xl text-green-400" />
+            </div>
+          </div>
+          
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-600 text-sm font-medium">Total</p>
+                <p className="text-3xl font-bold text-blue-700">{emergencyAlerts.length}</p>
+              </div>
+              <FaBell className="text-4xl text-blue-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Alerts */}
+        {pendingAlerts.length > 0 && (
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">🚨 Pending Emergency Alerts</h3>
+            <div className="space-y-4">
+              {pendingAlerts.map(alert => (
+                <div key={alert._id} className={`border-2 rounded-lg p-6 ${getSeverityColor(alert.severity)}`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(alert.status)}`}>
+                          {alert.status}
+                        </span>
+                        <span className="px-3 py-1 bg-white rounded-full text-xs font-bold uppercase border-2">
+                          {alert.severity} PRIORITY
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {new Date(alert.alertSentAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <h4 className="text-lg font-bold mb-2">
+                        {alert.emergencyType.replace(/_/g, ' ').toUpperCase()}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div key="patient-info" className="bg-white bg-opacity-70 rounded-lg p-4">
+                      <h5 className="font-semibold mb-2 flex items-center gap-2">
+                        <FaUser /> Patient Information
+                      </h5>
+                      <p className="text-sm"><strong>Name:</strong> {alert.patientName}</p>
+                      <p className="text-sm"><strong>Phone:</strong> <a href={`tel:${alert.patientPhone}`} className="text-blue-600 hover:underline">{alert.patientPhone}</a></p>
+                      <p className="text-sm"><strong>Email:</strong> <a href={`mailto:${alert.patientEmail}`} className="text-blue-600 hover:underline">{alert.patientEmail}</a></p>
+                      {alert.location && <p className="text-sm"><strong>Location:</strong> {alert.location}</p>}
+                    </div>
+
+                    {alert.currentVitals && (alert.currentVitals.bloodPressure || alert.currentVitals.heartRate) && (
+                      <div key="vitals" className="bg-white bg-opacity-70 rounded-lg p-4">
+                        <h5 className="font-semibold mb-2 flex items-center gap-2">
+                          <FaStethoscope /> Current Vitals
+                        </h5>
+                        {alert.currentVitals.bloodPressure && <p className="text-sm"><strong>BP:</strong> {alert.currentVitals.bloodPressure}</p>}
+                        {alert.currentVitals.heartRate && <p className="text-sm"><strong>Heart Rate:</strong> {alert.currentVitals.heartRate}</p>}
+                        {alert.currentVitals.temperature && <p className="text-sm"><strong>Temperature:</strong> {alert.currentVitals.temperature}</p>}
+                        {alert.currentVitals.oxygenLevel && <p className="text-sm"><strong>Oxygen:</strong> {alert.currentVitals.oxygenLevel}</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-white bg-opacity-70 rounded-lg p-4 mb-4">
+                    <h5 className="font-semibold mb-2">Description:</h5>
+                    <p className="text-sm whitespace-pre-wrap">{alert.description}</p>
+                  </div>
+
+                  {alert.response && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                      <h5 className="font-semibold mb-2 text-blue-900">Your Response:</h5>
+                      <p className="text-sm text-blue-800">{alert.response}</p>
+                      <p className="text-xs text-blue-600 mt-2">Responded at: {new Date(alert.respondedAt).toLocaleString()}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 flex-wrap">
+                    {alert.status === 'pending' && (
+                      <button
+                        onClick={() => handleAcknowledgeAlert(alert._id)}
+                        className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Acknowledge
+                      </button>
+                    )}
+                    
+                    <button
+                      onClick={() => handleVideoCallWithPatient(alert)}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2"
+                    >
+                      <FaVideo /> Video Call Patient
+                    </button>
+                    
+                    <button
+                      onClick={() => handleResolveAlert(alert._id)}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Mark Resolved
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteAlert(alert._id)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors inline-flex items-center gap-2"
+                    >
+                      <FaTrash /> Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Resolved Alerts */}
+        {resolvedAlerts.length > 0 && (
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">✅ Resolved Alerts</h3>
+            <div className="space-y-4">
+              {resolvedAlerts.map(alert => (
+                <div key={alert._id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-semibold">{alert.patientName}</p>
+                      <p className="text-sm text-gray-600">{alert.emergencyType.replace(/_/g, ' ')}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold">
+                          RESOLVED
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(alert.resolvedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAlert(alert._id)}
+                        className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-1"
+                        title="Delete alert"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* No Alerts */}
+        {isLoadingAlerts ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading emergency alerts...</p>
+          </div>
+        ) : emergencyAlerts.length === 0 && (
+          <div className="bg-white rounded-lg shadow p-12 text-center text-gray-500">
+            <FaBell className="text-5xl mx-auto mb-4 text-gray-300" />
+            <p className="text-lg mb-2">No emergency alerts</p>
+            <p className="text-sm">Emergency alerts from patients will appear here</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderModal = () => {
     if (!showModal) return null;
@@ -2107,6 +3156,250 @@ const DoctorDashboard = () => {
         case 'edit-medical-report':
           return <MedicalReportForm onClose={closeModal} onSave={handleSaveMedicalReport} initialData={selectedItem} user={user} isLoaded={isLoaded} />;
 
+        case 'medical-record':
+          return (
+            <div className="modal-content">
+              <h2 className="modal-title">📋 Medical Record Details</h2>
+              <div className="space-y-6">
+                {/* Patient Information */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-l-4 border-blue-600">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Patient Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="info-group">
+                      <label className="info-label">Patient Name</label>
+                      <p className="info-value">{selectedItem.patientName}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Patient ID</label>
+                      <p className="info-value">{selectedItem.patientId}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Date</label>
+                      <p className="info-value">{selectedItem.date}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Status</label>
+                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                        selectedItem.status === 'active' ? 'bg-green-100 text-green-800' :
+                        selectedItem.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {(selectedItem.status || 'active').toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Diagnosis */}
+                <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-4 border-l-4 border-red-500">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <FaStethoscope className="text-red-600" />
+                    Diagnosis
+                  </h3>
+                  <p className="info-value text-gray-700">{selectedItem.diagnosis}</p>
+                </div>
+
+                {/* Symptoms */}
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg p-4 border-l-4 border-yellow-500">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <FaNotesMedical className="text-yellow-600" />
+                    Symptoms
+                  </h3>
+                  <p className="info-value text-gray-700">{selectedItem.symptoms}</p>
+                </div>
+
+                {/* Treatment */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-l-4 border-green-600">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                    <FaPills className="text-green-600" />
+                    Treatment
+                  </h3>
+                  <p className="info-value text-gray-700">{selectedItem.treatment}</p>
+                </div>
+
+                {/* Notes */}
+                {selectedItem.notes && (
+                  <div className="info-group">
+                    <label className="info-label">Additional Notes</label>
+                    <p className="info-value">{selectedItem.notes}</p>
+                  </div>
+                )}
+
+                {/* Follow-up */}
+                {selectedItem.followUp && (
+                  <div className="info-group">
+                    <label className="info-label">Follow-up</label>
+                    <p className="info-value">{selectedItem.followUp}</p>
+                  </div>
+                )}
+              </div>
+              <div className="modal-actions">
+                <button 
+                  onClick={() => handlePrintMedicalRecord(selectedItem)}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <FaPrint /> Print Record
+                </button>
+                <button 
+                  onClick={() => openModal('edit-medical-report', selectedItem)}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  <FaEdit /> Edit
+                </button>
+                <button 
+                  onClick={() => {
+                    console.log('🗑️ Modal delete clicked for item:', { id: selectedItem.id, _id: selectedItem._id, selectedItem });
+                    closeModal();
+                    if (!selectedItem.id && !selectedItem._id) {
+                      alert('Cannot delete: Invalid record ID');
+                      return;
+                    }
+                    handleCancelAppointment(selectedItem.id || selectedItem._id);
+                  }}
+                  className="btn-danger inline-flex items-center gap-2"
+                  title="Cancel Appointment"
+                >
+                  <FaTrash /> Delete
+                </button>
+                <button onClick={closeModal} className="btn-secondary">
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+
+        case 'prescription':
+          return (
+            <div className="modal-content">
+              <h2 className="modal-title">💊 Prescription Details</h2>
+              <div className="space-y-6">
+                {/* Patient Information */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-l-4 border-blue-600">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Patient Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="info-group">
+                      <label className="info-label">Patient Name</label>
+                      <p className="info-value">{selectedItem.patientName}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Patient ID</label>
+                      <p className="info-value">{selectedItem.patientId}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Date Prescribed</label>
+                      <p className="info-value">{new Date(selectedItem.date || Date.now()).toLocaleDateString()}</p>
+                    </div>
+                    <div className="info-group">
+                      <label className="info-label">Status</label>
+                      <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${
+                        selectedItem.status === 'active' ? 'bg-green-100 text-green-800' :
+                        selectedItem.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {(selectedItem.status || 'active').toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Medication Details */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-l-4 border-green-600">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Medication Details</h3>
+                  <div className="space-y-3">
+                    <div className="info-group">
+                      <label className="info-label">Medication</label>
+                      <p className="info-value text-xl font-bold text-green-700">{selectedItem.medication}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="info-group">
+                        <label className="info-label">Dosage</label>
+                        <p className="info-value text-lg font-semibold text-green-600">{selectedItem.dosage}</p>
+                      </div>
+                      <div className="info-group">
+                        <label className="info-label">Duration</label>
+                        <p className="info-value">{selectedItem.duration}</p>
+                      </div>
+                      {selectedItem.frequency && (
+                        <div className="info-group">
+                          <label className="info-label">Frequency</label>
+                          <p className="info-value">{selectedItem.frequency}</p>
+                        </div>
+                      )}
+                      <div className="info-group">
+                        <label className="info-label">Refills</label>
+                        <p className="info-value">{selectedItem.refills || 0} remaining</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pharmacy Information */}
+                {selectedItem.pharmacy && (
+                  <div className="info-group">
+                    <label className="info-label">Pharmacy</label>
+                    <p className="info-value">{selectedItem.pharmacy}</p>
+                  </div>
+                )}
+
+                {/* Instructions */}
+                {selectedItem.instructions && (
+                  <div className="bg-yellow-50 rounded-lg p-4 border-l-4 border-yellow-500">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                      <FaExclamationTriangle className="text-yellow-600" />
+                      Important Instructions
+                    </h3>
+                    <p className="info-value text-gray-700">{selectedItem.instructions}</p>
+                  </div>
+                )}
+
+                {/* Additional Notes */}
+                {selectedItem.notes && (
+                  <div className="info-group">
+                    <label className="info-label">Additional Notes</label>
+                    <p className="info-value">{selectedItem.notes}</p>
+                  </div>
+                )}
+
+                {/* Prescription ID */}
+                <div className="pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-500">
+                    <span className="font-medium">Prescription ID:</span> {selectedItem._id}
+                  </p>
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button 
+                  onClick={() => handlePrintPrescription(selectedItem)}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <FaPrint /> Print Prescription
+                </button>
+                <button 
+                  onClick={() => openModal('edit-prescription', selectedItem)}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  <FaEdit /> Edit
+                </button>
+                <button onClick={closeModal} className="btn-secondary">
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+
+        case 'edit-prescription':
+          return (
+            <div className="modal-content">
+              <h2 className="modal-title">Edit Prescription</h2>
+              <p className="text-gray-600 mb-4">Edit prescription functionality will be implemented here</p>
+              <div className="modal-actions">
+                <button onClick={closeModal} className="btn-secondary">
+                  Close
+                </button>
+              </div>
+            </div>
+          );
+
         default:
           return (
             <div className="modal-content">
@@ -2257,6 +3550,25 @@ const DoctorDashboard = () => {
     }
   };
 
+  // Handle deleting prescription
+  const handleDeletePrescription = async (prescriptionId) => {
+    if (!window.confirm('Are you sure you want to delete this prescription? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deletePrescription(prescriptionId);
+      alert('Prescription deleted successfully!');
+      
+      // Refresh prescriptions list
+      fetchDoctorPrescriptions();
+      
+    } catch (error) {
+      console.error('Error deleting prescription:', error);
+      alert('Failed to delete prescription. Please try again.');
+    }
+  };
+
   // Fetch doctor's medical records
   const fetchDoctorMedicalRecords = async () => {
     if (!user?.id || !isLoaded) return;
@@ -2310,15 +3622,56 @@ const DoctorDashboard = () => {
 
   return (
     <>
-      {/* Video Call Room - Renders on top of everything when active */}
+      {/* Video Call Room - Full screen overlay on top of everything */}
       {activeVideoCall && videoCallData && (
-        <VideoCallRoom
-          roomID={videoCallData.roomID}
-          userID={videoCallData.userID}
-          userName={videoCallData.userName}
-          patientData={videoCallData.patientData}
-          onCallEnd={handleVideoCallEnd}
-        />
+        <div className="fixed inset-0 z-[9999] bg-black animate-fadeIn">
+          {/* End Call Button */}
+          <div className="absolute top-4 right-4 z-[10000]">
+            <button
+              onClick={handleVideoCallEnd}
+              className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-2xl transition-all duration-200 hover:scale-105"
+            >
+              <FaPhoneSlash className="text-lg" />
+              End Call
+            </button>
+          </div>
+          
+          {/* Video Call Interface */}
+          <VideoCallRoom
+            roomID={videoCallData.roomID}
+            userID={videoCallData.userID}
+            userName={videoCallData.userName}
+            patientData={videoCallData.patientData}
+            onCallEnd={handleVideoCallEnd}
+          />
+        </div>
+      )}
+
+      {/* Emergency Alert Video Call Room */}
+      {showVideoCall && videoCallData && (
+        <div className="fixed inset-0 z-50 bg-black">
+          <div className="absolute top-4 right-4 z-50">
+            <button
+              onClick={() => {
+                setShowVideoCall(false);
+                setVideoCallData(null);
+              }}
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow-lg transition-colors"
+            >
+              End Call
+            </button>
+          </div>
+          <VideoCallRoom
+            roomID={videoCallData.roomID}
+            userID={videoCallData.userID}
+            userName={videoCallData.userName}
+            patientData={videoCallData.patientData}
+            onCallEnd={() => {
+              setShowVideoCall(false);
+              setVideoCallData(null);
+            }}
+          />
+        </div>
       )}
 
       {/* Navbar - positioned outside dashboard container */}
@@ -2363,11 +3716,15 @@ const DoctorDashboard = () => {
         {activeTab === 'medical-records' && renderMedicalRecords()}
         {activeTab === 'medical-reports' && renderMedicalReports()}
         {activeTab === 'prescriptions' && renderPrescriptions()}
+        {activeTab === 'emergency-alerts' && renderEmergencyAlerts()}
         {/* {activeTab === 'analytics' && renderAnalytics()} */}
       </div>
 
       {/* Modal */}
       {renderModal()}
+
+      {/* Alert Response Modal */}
+
         </div>
       </div>
     </>

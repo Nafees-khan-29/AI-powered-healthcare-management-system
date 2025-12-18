@@ -220,7 +220,13 @@ const Dashboard = () => {
                         <FaUser className="inline mr-2" />
                         Profile
                       </button>
-                      <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                      <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 git pull origion main
+fatal: 'origion' does not appear to be a git repository
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+PS C:\Users\Nasir\Desktop\HEALTH-CARE> hover:bg-gray-100">
                         <FaCog className="inline mr-2" />
                         Settings
                       </button>

@@ -108,6 +108,7 @@ const AppointmentComponent = () => {
     name: '',
     age: '',
     gender: '',
+    consultationType: '',
     phone: '',
     email: '',
     notes: '',
@@ -131,7 +132,16 @@ const AppointmentComponent = () => {
       if (!formData.name.trim()) errors.name = 'Name is required';
       if (!formData.age || formData.age < 1) errors.age = 'Valid age is required';
       if (!formData.gender) errors.gender = 'Gender is required';
-      if (!formData.phone.trim()) errors.phone = 'Phone number is required';
+      if (!formData.consultationType) errors.consultationType = 'Consultation type is required';
+      
+      // Phone validation - must be exactly 10 digits
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!formData.phone.trim()) {
+        errors.phone = 'Phone number is required';
+      } else if (!phoneRegex.test(formData.phone)) {
+        errors.phone = 'Phone number must be exactly 10 digits';
+      }
+      
       if (!formData.email.trim()) errors.email = 'Valid email is required';
     }
     if (currentStep === 3) {
@@ -168,10 +178,22 @@ const AppointmentComponent = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for phone number - only allow digits and limit to 10
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/[^0-9]/g, '');
+      if (digitsOnly.length <= 10) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: digitsOnly
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
     
     // Clear error when user starts typing
     if (formErrors[name]) {
@@ -209,6 +231,44 @@ const AppointmentComponent = () => {
       return;
     }
     
+    // Validate phone number - must be exactly 10 digits
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      alert('⚠️ Invalid Phone Number\n\nPlease enter a valid 10-digit phone number.\n\nExample: 9876543210');
+      return;
+    }
+    
+    // Validate selected date is not a weekend
+    const dayOfWeek = selectedDate.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      alert('⚠️ Weekend Not Available\n\nAppointments are only available Monday through Friday.\n\nPlease select a weekday.');
+      return;
+    }
+    
+    // Validate appointment is not in the past
+    const [time, period] = selectedTime.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    
+    const appointmentDateTime = new Date(selectedDate);
+    appointmentDateTime.setHours(hours, minutes, 0, 0);
+    
+    const now = new Date();
+    
+    if (appointmentDateTime < now) {
+      alert('⚠️ Invalid Appointment Time\n\nYou cannot book an appointment in the past. Please select a future date and time.');
+      return;
+    }
+    
+    // Validate working hours (9 AM to 5 PM)
+    if (hours < 9 || hours >= 17) {
+      alert('⚠️ Outside Working Hours\n\nAppointments are only available between 9:00 AM and 5:00 PM.\n\nPlease select a time within working hours.');
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -219,6 +279,7 @@ const AppointmentComponent = () => {
         patientPhone: formData.phone,
         patientAge: parseInt(formData.age),
         patientGender: formData.gender,
+        consultationType: formData.consultationType,
         doctorId: selectedDoctor._id || 'temp-id',
         doctorName: selectedDoctor.name,
         doctorSpecialization: selectedDoctor.specialization,
@@ -277,6 +338,13 @@ const AppointmentComponent = () => {
             <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-gray-800 mb-2">Choose Your Preferred Time</h3>
               <p className="text-gray-800">Select a date and time that works best for you</p>
+              
+              {/* Working Hours Info */}
+              <div className="mt-4 inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
+                <p className="text-sm font-medium">
+                  📅 Working Days: Monday - Friday | ⏰ Hours: 9:00 AM - 5:00 PM
+                </p>
+              </div>
               </div>
               
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6">
@@ -285,7 +353,18 @@ const AppointmentComponent = () => {
                 value={selectedDate}
                 minDate={new Date()}
                 className="w-full max-w-md mx-auto mb-6"
+                tileDisabled={({ date, view }) => {
+                  // Disable weekends (Saturday = 6, Sunday = 0)
+                  if (view === 'month') {
+                    const day = date.getDay();
+                    return day === 0 || day === 6; // Disable Sunday and Saturday
+                  }
+                  return false;
+                }}
               />
+              <p className="text-center text-sm text-gray-600 mt-2">
+                * Weekends are not available for appointments
+              </p>
             </div>
             
             <div className="bg-white rounded-2xl p-6 shadow-lg">
@@ -294,10 +373,52 @@ const AppointmentComponent = () => {
                 Available Time Slots for {format(selectedDate, 'MMMM do, yyyy')}
                 {loadingSlots && <FaSpinner className="animate-spin text-blue-500 text-sm" />}
               </h4>
+              
+              {/* Show message if weekend is somehow selected */}
+              {(selectedDate.getDay() === 0 || selectedDate.getDay() === 6) ? (
+                <div className="text-center py-8">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                    <p className="text-red-600 font-semibold text-lg mb-2">🚫 Weekend - Not Available</p>
+                    <p className="text-red-500">
+                      Appointments are only available Monday through Friday.
+                      <br />
+                      Please select a weekday from the calendar.
+                    </p>
+                  </div>
+                </div>
+              ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {allTimeSlots.map((slot) => {
                   const isBooked = bookedSlots.includes(slot.time);
-                  const isAvailable = !isBooked;
+                  
+                  // Check if the time slot is in the past
+                  const isPastSlot = (() => {
+                    const today = new Date();
+                    const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+                    const todayStr = format(today, 'yyyy-MM-dd');
+                    
+                    // If selected date is in the future, no slots are in the past
+                    if (selectedDateStr > todayStr) return false;
+                    
+                    // If selected date is today, check if time has passed
+                    if (selectedDateStr === todayStr) {
+                      const [time, period] = slot.time.split(' ');
+                      let [hours, minutes] = time.split(':').map(Number);
+                      
+                      // Convert to 24-hour format
+                      if (period === 'PM' && hours !== 12) hours += 12;
+                      if (period === 'AM' && hours === 12) hours = 0;
+                      
+                      const slotDateTime = new Date(today);
+                      slotDateTime.setHours(hours, minutes, 0, 0);
+                      
+                      return slotDateTime < today;
+                    }
+                    
+                    return false;
+                  })();
+                  
+                  const isAvailable = !isBooked && !isPastSlot;
                   
                   return (
                     <button
@@ -323,11 +444,17 @@ const AppointmentComponent = () => {
                           <span className="text-xs text-red-600 font-semibold">Booked</span>
                         </span>
                       )}
+                      {isPastSlot && !isBooked && (
+                        <span className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center border-2 border-gray-300">
+                          <span className="text-xs text-gray-500 font-semibold">Past</span>
+                        </span>
+                      )}
                     </button>
                   );
                 })}
-                </div>
               </div>
+              )}
+            </div>
             </div>
         );
 
@@ -398,6 +525,24 @@ const AppointmentComponent = () => {
                   </div>
 
               <div className="space-y-2">
+                <label className="block text-gray-700 font-medium">Consultation Type *</label>
+                    <select
+                      name="consultationType"
+                      required
+                  className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                    formErrors.consultationType ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'
+                  }`}
+                      value={formData.consultationType}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Consultation Type</option>
+                      <option value="online">Online Consultation</option>
+                      <option value="offline">Offline Consultation</option>
+                    </select>
+                {formErrors.consultationType && <p className="text-red-500 text-sm">{formErrors.consultationType}</p>}
+                  </div>
+
+              <div className="space-y-2">
                 <label className="block text-gray-700 font-medium">Phone Number *</label>
                 <div className="relative">
                   <FaPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -405,15 +550,20 @@ const AppointmentComponent = () => {
                       type="tel"
                       name="phone"
                       required
+                      maxLength="10"
+                      pattern="[0-9]{10}"
                     className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                       formErrors.phone ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'
                     }`}
                       value={formData.phone}
                       onChange={handleInputChange}
-                    placeholder="Enter your phone number"
+                    placeholder="9876543210"
                     />
                 </div>
                 {formErrors.phone && <p className="text-red-500 text-sm">{formErrors.phone}</p>}
+                {!formErrors.phone && (
+                  <p className="text-xs text-gray-500">Enter 10-digit phone number (digits only)</p>
+                )}
                   </div>
 
               <div className="md:col-span-2 space-y-2">
@@ -606,6 +756,10 @@ const AppointmentComponent = () => {
                 <div>
                   <span className="text-gray-800">Gender:</span>
                   <span className="ml-2 font-medium capitalize">{formData.gender}</span>
+                </div>
+                <div>
+                  <span className="text-gray-800">Type:</span>
+                  <span className="ml-2 font-medium capitalize">{formData.consultationType === 'online' ? 'Online Consultation' : 'Offline Consultation'}</span>
                 </div>
                 <div>
                   <span className="text-gray-800">Phone:</span>

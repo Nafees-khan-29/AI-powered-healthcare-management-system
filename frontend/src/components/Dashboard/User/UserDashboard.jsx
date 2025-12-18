@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { getUserAppointments, updateAppointmentStatus, cancelAppointment, updateAppointment } from '../../../services/appointmentService';
 import { getPatientMedicalRecords, getPatientPrescriptions } from '../../../services/medicalRecordService';
+import { addHealthMetric, getLatestHealthMetrics, getUserHealthMetrics, deleteHealthMetric } from '../../../services/healthMetricService';
+import { createEmergencyAlert, getPatientAlerts } from '../../../services/emergencyAlertService';
 import Navbar from '../../Hero-com/Navbar';
 import { 
   FaCalendarAlt, 
@@ -389,6 +391,70 @@ const UserDashboard = () => {
     }
   };
 
+  // Fetch health metrics
+  const fetchHealthMetrics = async () => {
+    if (!isLoaded || !user) return;
+    
+    setIsLoadingMetrics(true);
+    try {
+      console.log('📥 Fetching health metrics for user:', user.id);
+      const response = await getLatestHealthMetrics(user.id);
+      console.log('✅ Health metrics response:', response);
+      
+      if (response.success && response.metrics) {
+        const metrics = response.metrics;
+        setHealthMetrics({
+          bloodPressure: metrics.bloodPressureSystolic && metrics.bloodPressureDiastolic 
+            ? `${metrics.bloodPressureSystolic}/${metrics.bloodPressureDiastolic}` 
+            : '--/--',
+          heartRate: metrics.heartRate ? `${metrics.heartRate} bpm` : '-- bpm',
+          temperature: metrics.temperature ? `${metrics.temperature}°F` : '-- °F',
+          weight: metrics.weight ? `${metrics.weight} kg` : '-- kg',
+          height: metrics.height ? `${metrics.height} cm` : '-- cm',
+          bmi: metrics.bmi ? metrics.bmi.toString() : '--'
+        });
+      }
+      
+      // Also fetch history
+      const historyResponse = await getUserHealthMetrics(user.id, { limit: 10 });
+      if (historyResponse.success) {
+        setHealthHistory(historyResponse.metrics);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching health metrics:', error);
+    } finally {
+      setIsLoadingMetrics(false);
+    }
+  };
+
+  // Fetch emergency alerts
+  const fetchEmergencyAlerts = async () => {
+    if (!isLoaded || !user) return;
+    
+    setIsLoadingAlerts(true);
+    try {
+      console.log('📥 Fetching emergency alerts for user:', user.id);
+      const response = await getPatientAlerts(user.id);
+      console.log('✅ Emergency alerts response:', response);
+      
+      if (response.success) {
+        setEmergencyAlerts(response.alerts);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching emergency alerts:', error);
+    } finally {
+      setIsLoadingAlerts(false);
+    }
+  };
+
+  // Fetch health metrics and alerts on mount
+  useEffect(() => {
+    if (activeTab === 'health-tracking') {
+      fetchHealthMetrics();
+      fetchEmergencyAlerts();
+    }
+  }, [activeTab, user, isLoaded]);
+
   // Medical records state
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [isLoadingMedicalRecords, setIsLoadingMedicalRecords] = useState(false);
@@ -397,13 +463,48 @@ const UserDashboard = () => {
   const [prescriptions, setPrescriptions] = useState([]);
   const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
 
+  // Health Metrics State
   const [healthMetrics, setHealthMetrics] = useState({
-    bloodPressure: '120/80',
-    heartRate: '72 bpm',
-    temperature: '98.6°F',
-    weight: '70 kg',
-    height: '175 cm',
-    bmi: '22.9'
+    bloodPressure: '--/--',
+    heartRate: '-- bpm',
+    temperature: '-- °F',
+    weight: '-- kg',
+    height: '-- cm',
+    bmi: '--'
+  });
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+  const [healthHistory, setHealthHistory] = useState([]);
+  const [showAddMetricModal, setShowAddMetricModal] = useState(false);
+  const [newMetric, setNewMetric] = useState({
+    bloodPressureSystolic: '',
+    bloodPressureDiastolic: '',
+    heartRate: '',
+    temperature: '',
+    oxygenSaturation: '',
+    weight: '',
+    height: '',
+    bloodSugar: '',
+    bloodSugarType: 'random',
+    cholesterol: '',
+    notes: ''
+  });
+
+  // Emergency Alert State
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyAlerts, setEmergencyAlerts] = useState([]);
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
+  const [emergencyData, setEmergencyData] = useState({
+    emergencyType: '',
+    severity: 'medium',
+    description: '',
+    location: '',
+    phoneNumber: '',
+    currentVitals: {
+      bloodPressure: '',
+      heartRate: '',
+      temperature: '',
+      oxygenLevel: ''
+    }
   });
 
   const tabs = [
@@ -411,7 +512,8 @@ const UserDashboard = () => {
     { id: 'appointments', label: 'Appointments', icon: FaCalendarAlt },
     { id: 'medical-records', label: 'Medical Records', icon: FaFileMedical },
     { id: 'prescriptions', label: 'Prescriptions', icon: FaPills },
-    { id: 'health-tracking', label: 'Health Tracking', icon: FaHeartbeat }
+    { id: 'health-tracking', label: 'Health Tracking', icon: FaHeartbeat },
+    { id: 'emergency-alerts', label: 'Emergency Alerts', icon: FaBell }
   ];
 
   const handleTabChange = (tabId) => {
@@ -455,8 +557,39 @@ const UserDashboard = () => {
     }
   };
 
-  const renderOverview = () => (
+  const renderOverview = () => {
+    // Check for active video call link
+    const activeVideoCallAlert = emergencyAlerts.find(alert => 
+      alert.videoCallLink && alert.status !== 'resolved'
+    );
+
+    return (
     <div className="space-y-6">
+      {/* Active Video Call Notification */}
+      {activeVideoCallAlert && (
+        <div className="bg-gradient-to-r from-green-500 via-green-600 to-green-700 rounded-2xl p-6 text-white shadow-2xl border-4 border-green-400 animate-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <FaVideo className="text-5xl animate-bounce" />
+              <div>
+                <h2 className="text-2xl font-bold mb-1">🎥 Video Call Available!</h2>
+                <p className="text-white/90 text-lg">
+                  {activeVideoCallAlert.doctorName || 'A doctor'} is waiting to connect with you
+                </p>
+              </div>
+            </div>
+            <a
+              href={activeVideoCallAlert.videoCallLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 bg-white text-green-600 hover:bg-green-50 font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg"
+            >
+              Join Now
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl p-6 text-white shadow-lg">
         <h2 className="text-2xl font-bold mb-2">Welcome back, {user?.name || 'Patient'}!</h2>
@@ -584,7 +717,8 @@ const UserDashboard = () => {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderAppointments = () => (
     <div className="space-y-6">
@@ -890,85 +1024,455 @@ const UserDashboard = () => {
     </div>
   );
 
+  // Handle add health metric
+  const handleAddHealthMetric = async () => {
+    try {
+      const metricData = {
+        userId: user.id,
+        userEmail: user.primaryEmailAddress?.emailAddress,
+        userName: user.fullName,
+        ...newMetric
+      };
+
+      await addHealthMetric(metricData);
+      alert('Health metric added successfully!');
+      setShowAddMetricModal(false);
+      setNewMetric({
+        bloodPressureSystolic: '',
+        bloodPressureDiastolic: '',
+        heartRate: '',
+        temperature: '',
+        oxygenSaturation: '',
+        weight: '',
+        height: '',
+        bloodSugar: '',
+        bloodSugarType: 'random',
+        cholesterol: '',
+        notes: ''
+      });
+      fetchHealthMetrics();
+    } catch (error) {
+      alert('Failed to add health metric: ' + error.message);
+    }
+  };
+
+  // Handle delete health metric
+  const handleDeleteHealthMetric = async (metricId) => {
+    if (!window.confirm('Are you sure you want to delete this health record? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteHealthMetric(metricId);
+      alert('Health record deleted successfully!');
+      fetchHealthMetrics();
+    } catch (error) {
+      alert('Failed to delete health record: ' + error.message);
+    }
+  };
+
+  // Handle send emergency alert
+  const handleSendEmergencyAlert = async () => {
+    if (!emergencyData.emergencyType || !emergencyData.description) {
+      alert('Please select emergency type and provide description');
+      return;
+    }
+
+    if (!emergencyData.phoneNumber || emergencyData.phoneNumber.length !== 10) {
+      alert('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    try {
+      const alertData = {
+        patientId: user.id,
+        patientEmail: user.primaryEmailAddress?.emailAddress,
+        patientName: user.fullName,
+        patientPhone: emergencyData.phoneNumber,
+        ...emergencyData
+      };
+
+      await createEmergencyAlert(alertData);
+      alert('🚨 Emergency alert sent successfully! A doctor will contact you shortly.');
+      setShowEmergencyModal(false);
+      setEmergencyData({
+        emergencyType: '',
+        severity: 'medium',
+        description: '',
+        location: '',
+        phoneNumber: '',
+        currentVitals: {
+          bloodPressure: '',
+          heartRate: '',
+          temperature: '',
+          oxygenLevel: ''
+        }
+      });
+      fetchEmergencyAlerts();
+    } catch (error) {
+      alert('Failed to send emergency alert: ' + error.message);
+    }
+  };
+
   const renderHealthTracking = () => (
     <div className="space-y-6">
-      {/* Health Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="dashboard-card p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <FaHeartbeat className="text-blue-600" />
-            Vital Signs
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span>Blood Pressure</span>
-              <span className="font-semibold">{healthMetrics.bloodPressure}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Heart Rate</span>
-              <span className="font-semibold">{healthMetrics.heartRate}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Temperature</span>
-              <span className="font-semibold">{healthMetrics.temperature}</span>
-            </div>
+      {/* Emergency Alert Button */}
+      <div className="dashboard-card bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-red-700 mb-2">🚨 Emergency Alert</h3>
+            <p className="text-sm text-red-600">Need immediate medical attention? Alert your doctor now</p>
           </div>
-        </div>
-
-        <div className="dashboard-card p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <FaUser className="text-cyan-600" />
-            Body Metrics
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span>Weight</span>
-              <span className="font-semibold">{healthMetrics.weight}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Height</span>
-              <span className="font-semibold">{healthMetrics.height}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>BMI</span>
-              <span className="font-semibold">{healthMetrics.bmi}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="dashboard-card p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <FaBell className="text-blue-600" />
-            Reminders
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <FaCheckCircle className="text-cyan-600" />
-              <span>Take morning medication</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <FaClock className="text-blue-600" />
-              <span>Blood pressure check</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <FaExclamationTriangle className="text-blue-600" />
-              <span>Schedule follow-up</span>
-            </div>
-          </div>
+          <button
+            onClick={() => setShowEmergencyModal(true)}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all transform hover:scale-105 shadow-lg"
+          >
+            Send Emergency Alert
+          </button>
         </div>
       </div>
 
-      {/* Health Trends Chart Placeholder */}
-      <div className="dashboard-card p-6">
-        <h3 className="text-lg font-semibold mb-4">Health Trends</h3>
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
-          <FaHeartbeat className="text-4xl mx-auto mb-4 text-blue-300" />
-          <p className="text-gray-700">Health trends chart will be displayed here</p>
-          <p className="text-sm text-gray-600">Track your progress over time</p>
-        </div>
+      {/* Action Buttons */}
+      <div className="flex gap-4">
+        <button
+          onClick={() => setShowAddMetricModal(true)}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
+        >
+          <FaPlus /> Add Health Metric
+        </button>
+        <button
+          onClick={fetchHealthMetrics}
+          className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all"
+        >
+          Refresh
+        </button>
       </div>
+
+      {isLoadingMetrics ? (
+        <div className="dashboard-card p-12 text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600">Loading health metrics...</p>
+        </div>
+      ) : (
+        <>
+          {/* Health Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="dashboard-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FaHeartbeat className="text-blue-600" />
+                Vital Signs
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Blood Pressure</span>
+                  <span className="font-semibold">{healthMetrics.bloodPressure}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Heart Rate</span>
+                  <span className="font-semibold">{healthMetrics.heartRate}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Temperature</span>
+                  <span className="font-semibold">{healthMetrics.temperature}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="dashboard-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FaUser className="text-cyan-600" />
+                Body Metrics
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Weight</span>
+                  <span className="font-semibold">{healthMetrics.weight}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Height</span>
+                  <span className="font-semibold">{healthMetrics.height}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>BMI</span>
+                  <span className="font-semibold">{healthMetrics.bmi}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="dashboard-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FaExclamationCircle className="text-orange-600" />
+                Emergency Alerts
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span>Total Sent</span>
+                  <span className="font-semibold">{emergencyAlerts.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pending</span>
+                  <span className="font-semibold text-orange-600">
+                    {emergencyAlerts.filter(a => a.status === 'pending').length}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Resolved</span>
+                  <span className="font-semibold text-green-600">
+                    {emergencyAlerts.filter(a => a.status === 'resolved').length}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Health History */}
+          {healthHistory.length > 0 && (
+            <div className="dashboard-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Recent Health Records</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2">Date</th>
+                      <th className="text-left py-2">BP</th>
+                      <th className="text-left py-2">Heart Rate</th>
+                      <th className="text-left py-2">Temp</th>
+                      <th className="text-left py-2">Weight</th>
+                      <th className="text-left py-2">Notes</th>
+                      <th className="text-right py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {healthHistory.slice(0, 5).map((record, index) => (
+                      <tr key={index} className="border-b hover:bg-gray-50">
+                        <td className="py-2">{new Date(record.recordedAt).toLocaleDateString()}</td>
+                        <td className="py-2">
+                          {record.bloodPressureSystolic && record.bloodPressureDiastolic
+                            ? `${record.bloodPressureSystolic}/${record.bloodPressureDiastolic}`
+                            : '--'}
+                        </td>
+                        <td className="py-2">{record.heartRate ? `${record.heartRate} bpm` : '--'}</td>
+                        <td className="py-2">{record.temperature ? `${record.temperature}°F` : '--'}</td>
+                        <td className="py-2">{record.weight ? `${record.weight} kg` : '--'}</td>
+                        <td className="py-2 text-sm text-gray-600">
+                          {record.notes ? (record.notes.length > 30 ? record.notes.substring(0, 30) + '...' : record.notes) : '--'}
+                        </td>
+                        <td className="py-2 text-right">
+                          <button
+                            onClick={() => handleDeleteHealthMetric(record._id)}
+                            className="text-red-600 hover:text-red-800 p-2 rounded hover:bg-red-50 transition-colors"
+                            title="Delete Record"
+                          >
+                            <FaTrash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
+
+  const renderEmergencyAlerts = () => {
+    const getSeverityColor = (severity) => {
+      switch (severity) {
+        case 'critical': return 'bg-red-100 border-red-300 text-red-800';
+        case 'high': return 'bg-orange-100 border-orange-300 text-orange-800';
+        case 'medium': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
+        case 'low': return 'bg-blue-100 border-blue-300 text-blue-800';
+        default: return 'bg-gray-100 border-gray-300 text-gray-800';
+      }
+    };
+
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'pending': return 'bg-red-100 text-red-800';
+        case 'acknowledged': return 'bg-yellow-100 text-yellow-800';
+        case 'responded': return 'bg-blue-100 text-blue-800';
+        case 'resolved': return 'bg-green-100 text-green-800';
+        default: return 'bg-gray-100 text-gray-800';
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Emergency Alerts</h2>
+            <p className="text-gray-600 mt-1">Track your emergency alerts and responses</p>
+          </div>
+          <button
+            onClick={() => setShowEmergencyModal(true)}
+            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2"
+          >
+            <FaBell /> Send New Alert
+          </button>
+        </div>
+
+        {/* Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="dashboard-card bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-600 text-sm font-medium">Total Alerts</p>
+                <p className="text-3xl font-bold text-red-700">{emergencyAlerts.length}</p>
+              </div>
+              <FaBell className="text-4xl text-red-400" />
+            </div>
+          </div>
+          
+          <div className="dashboard-card bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-yellow-600 text-sm font-medium">Pending</p>
+                <p className="text-3xl font-bold text-yellow-700">
+                  {emergencyAlerts.filter(a => a.status === 'pending').length}
+                </p>
+              </div>
+              <FaExclamationTriangle className="text-4xl text-yellow-400" />
+            </div>
+          </div>
+          
+          <div className="dashboard-card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-600 text-sm font-medium">Responded</p>
+                <p className="text-3xl font-bold text-blue-700">
+                  {emergencyAlerts.filter(a => a.status === 'responded' || a.status === 'acknowledged').length}
+                </p>
+              </div>
+              <FaCheckCircle className="text-4xl text-blue-400" />
+            </div>
+          </div>
+          
+          <div className="dashboard-card bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-600 text-sm font-medium">Resolved</p>
+                <p className="text-3xl font-bold text-green-700">
+                  {emergencyAlerts.filter(a => a.status === 'resolved').length}
+                </p>
+              </div>
+              <FaCheckCircle className="text-4xl text-green-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Alerts List */}
+        {isLoadingAlerts ? (
+          <div className="dashboard-card p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600">Loading alerts...</p>
+          </div>
+        ) : emergencyAlerts.length === 0 ? (
+          <div className="dashboard-card p-12 text-center">
+            <FaBell className="text-5xl text-gray-300 mx-auto mb-4" />
+            <p className="text-lg text-gray-600 mb-2">No emergency alerts sent yet</p>
+            <p className="text-sm text-gray-500">Your emergency alerts will appear here</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {emergencyAlerts.map(alert => (
+              <div key={alert._id} className={`dashboard-card border-2 ${getSeverityColor(alert.severity)} p-6`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(alert.status)}`}>
+                        {alert.status}
+                      </span>
+                      <span className="px-3 py-1 bg-white rounded-full text-xs font-bold uppercase border-2">
+                        {alert.severity}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {new Date(alert.alertSentAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      {alert.emergencyType.replace(/_/g, ' ').toUpperCase()}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="bg-white bg-opacity-70 rounded-lg p-4 mb-4">
+                  <h4 className="font-semibold mb-2">Description:</h4>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{alert.description}</p>
+                </div>
+
+                {alert.location && (
+                  <div className="bg-white bg-opacity-70 rounded-lg p-3 mb-4">
+                    <p className="text-sm"><strong>Location:</strong> {alert.location}</p>
+                  </div>
+                )}
+
+                {/* Video Call Link */}
+                {alert.videoCallLink && (
+                  <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-400 rounded-lg p-5 mb-4 shadow-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FaVideo className="text-2xl text-green-600 animate-pulse" />
+                        <h4 className="font-bold text-green-900 text-lg">🎥 Video Call Available!</h4>
+                      </div>
+                      {alert.videoCallInitiatedAt && (
+                        <span className="text-xs text-green-700 bg-green-200 px-3 py-1 rounded-full">
+                          Initiated {new Date(alert.videoCallInitiatedAt).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-green-800 mb-4">
+                      {alert.doctorName || 'A doctor'} has started a video call. Click the button below to join immediately.
+                    </p>
+                    <a
+                      href={alert.videoCallLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg"
+                    >
+                      <FaVideo className="text-xl" />
+                      Join Video Call Now
+                    </a>
+                    <div className="mt-3 p-3 bg-white rounded-lg border border-green-300">
+                      <p className="text-xs text-gray-600 mb-1">Or copy this link:</p>
+                      <code className="text-xs text-gray-800 break-all block bg-gray-50 p-2 rounded">
+                        {alert.videoCallLink}
+                      </code>
+                    </div>
+                  </div>
+                )}
+
+                {alert.doctorName && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-blue-900 mb-2">Doctor Response:</h4>
+                    <p className="text-sm text-blue-800 mb-2"><strong>Doctor:</strong> {alert.doctorName}</p>
+                    {alert.acknowledgedAt && (
+                      <p className="text-xs text-blue-600">Acknowledged at: {new Date(alert.acknowledgedAt).toLocaleString()}</p>
+                    )}
+                    {alert.response && (
+                      <>
+                        <p className="text-sm text-blue-800 mt-3">{alert.response}</p>
+                        <p className="text-xs text-blue-600 mt-2">Responded at: {new Date(alert.respondedAt).toLocaleString()}</p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {alert.status === 'resolved' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-sm text-green-800"><strong>✅ Resolved:</strong> {new Date(alert.resolvedAt).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderModal = () => {
     if (!showModal) return null;
@@ -1656,10 +2160,298 @@ const UserDashboard = () => {
         {activeTab === 'medical-records' && renderMedicalRecords()}
         {activeTab === 'prescriptions' && renderPrescriptions()}
         {activeTab === 'health-tracking' && renderHealthTracking()}
+        {activeTab === 'emergency-alerts' && renderEmergencyAlerts()}
       </div>
 
       {/* Modal */}
       {renderModal()}
+
+      {/* Add Health Metric Modal */}
+      {showAddMetricModal && (
+        <div className="modal-overlay" onClick={() => setShowAddMetricModal(false)}>
+          <div className="modal-container max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="modal-content">
+              <h2 className="modal-title flex items-center gap-2">
+                <FaHeartbeat className="text-blue-600" />
+                Add Health Metric
+              </h2>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Blood Pressure Systolic</label>
+                    <input
+                      type="number"
+                      placeholder="120"
+                      className="form-input"
+                      value={newMetric.bloodPressureSystolic}
+                      onChange={(e) => setNewMetric({...newMetric, bloodPressureSystolic: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Blood Pressure Diastolic</label>
+                    <input
+                      type="number"
+                      placeholder="80"
+                      className="form-input"
+                      value={newMetric.bloodPressureDiastolic}
+                      onChange={(e) => setNewMetric({...newMetric, bloodPressureDiastolic: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Heart Rate (bpm)</label>
+                    <input
+                      type="number"
+                      placeholder="72"
+                      className="form-input"
+                      value={newMetric.heartRate}
+                      onChange={(e) => setNewMetric({...newMetric, heartRate: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Temperature (°F)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="98.6"
+                      className="form-input"
+                      value={newMetric.temperature}
+                      onChange={(e) => setNewMetric({...newMetric, temperature: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Weight (kg)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="70"
+                      className="form-input"
+                      value={newMetric.weight}
+                      onChange={(e) => setNewMetric({...newMetric, weight: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Height (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="175"
+                      className="form-input"
+                      value={newMetric.height}
+                      onChange={(e) => setNewMetric({...newMetric, height: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Oxygen Saturation (%)</label>
+                    <input
+                      type="number"
+                      placeholder="98"
+                      className="form-input"
+                      value={newMetric.oxygenSaturation}
+                      onChange={(e) => setNewMetric({...newMetric, oxygenSaturation: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Blood Sugar</label>
+                    <input
+                      type="number"
+                      placeholder="100"
+                      className="form-input"
+                      value={newMetric.bloodSugar}
+                      onChange={(e) => setNewMetric({...newMetric, bloodSugar: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="form-label">Notes (Optional)</label>
+                  <textarea
+                    className="form-input"
+                    rows="3"
+                    placeholder="Any additional notes..."
+                    value={newMetric.notes}
+                    onChange={(e) => setNewMetric({...newMetric, notes: e.target.value})}
+                  />
+                </div>
+
+                <div className="flex gap-4">
+                  <button onClick={handleAddHealthMetric} className="action-btn-primary">
+                    Save Metric
+                  </button>
+                  <button onClick={() => setShowAddMetricModal(false)} className="action-btn-secondary">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Alert Modal */}
+      {showEmergencyModal && (
+        <div className="modal-overlay" onClick={() => setShowEmergencyModal(false)}>
+          <div className="modal-container max-w-2xl" onClick={e => e.stopPropagation()}>
+            <div className="modal-content">
+              <h2 className="modal-title flex items-center gap-2 text-red-600">
+                <FaExclamationTriangle className="text-red-600" />
+                🚨 Emergency Alert
+              </h2>
+              
+              <div className="space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-700">
+                    This will immediately notify available doctors. Use only for genuine medical emergencies.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Emergency Type *</label>
+                    <select
+                      className="form-input"
+                      value={emergencyData.emergencyType}
+                      onChange={(e) => setEmergencyData({...emergencyData, emergencyType: e.target.value})}
+                    >
+                      <option value="">Select emergency type</option>
+                      <option value="severe_pain">Severe Pain</option>
+                      <option value="breathing_difficulty">Breathing Difficulty</option>
+                      <option value="chest_pain">Chest Pain</option>
+                      <option value="high_fever">High Fever</option>
+                      <option value="bleeding">Bleeding</option>
+                      <option value="loss_of_consciousness">Loss of Consciousness</option>
+                      <option value="severe_allergic_reaction">Severe Allergic Reaction</option>
+                      <option value="mental_health_crisis">Mental Health Crisis</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Severity *</label>
+                    <select
+                      className="form-input"
+                      value={emergencyData.severity}
+                      onChange={(e) => setEmergencyData({...emergencyData, severity: e.target.value})}
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label">Description *</label>
+                  <textarea
+                    className="form-input"
+                    rows="4"
+                    placeholder="Describe your emergency in detail..."
+                    value={emergencyData.description}
+                    onChange={(e) => setEmergencyData({...emergencyData, description: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Current Location</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Your current location"
+                    value={emergencyData.location}
+                    onChange={(e) => setEmergencyData({...emergencyData, location: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Contact Phone Number <span className="text-red-500">*</span></label>
+                  <input
+                    type="tel"
+                    className="form-input"
+                    placeholder="Enter 10-digit phone number"
+                    maxLength="10"
+                    pattern="[0-9]{10}"
+                    value={emergencyData.phoneNumber}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      setEmergencyData({...emergencyData, phoneNumber: value});
+                    }}
+                    required
+                  />
+                  {emergencyData.phoneNumber && emergencyData.phoneNumber.length !== 10 && (
+                    <p className="text-red-500 text-sm mt-1">Phone number must be exactly 10 digits</p>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">Current Vitals (Optional)</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Blood Pressure</label>
+                      <input
+                        type="text"
+                        placeholder="120/80"
+                        className="form-input"
+                        value={emergencyData.currentVitals.bloodPressure}
+                        onChange={(e) => setEmergencyData({
+                          ...emergencyData,
+                          currentVitals: {...emergencyData.currentVitals, bloodPressure: e.target.value}
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Heart Rate</label>
+                      <input
+                        type="text"
+                        placeholder="72 bpm"
+                        className="form-input"
+                        value={emergencyData.currentVitals.heartRate}
+                        onChange={(e) => setEmergencyData({
+                          ...emergencyData,
+                          currentVitals: {...emergencyData.currentVitals, heartRate: e.target.value}
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Temperature</label>
+                      <input
+                        type="text"
+                        placeholder="98.6°F"
+                        className="form-input"
+                        value={emergencyData.currentVitals.temperature}
+                        onChange={(e) => setEmergencyData({
+                          ...emergencyData,
+                          currentVitals: {...emergencyData.currentVitals, temperature: e.target.value}
+                        })}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label">Oxygen Level</label>
+                      <input
+                        type="text"
+                        placeholder="98%"
+                        className="form-input"
+                        value={emergencyData.currentVitals.oxygenLevel}
+                        onChange={(e) => setEmergencyData({
+                          ...emergencyData,
+                          currentVitals: {...emergencyData.currentVitals, oxygenLevel: e.target.value}
+                        })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <button onClick={handleSendEmergencyAlert} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all">
+                    🚨 Send Emergency Alert
+                  </button>
+                  <button onClick={() => setShowEmergencyModal(false)} className="action-btn-secondary">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       </div>
     </>
