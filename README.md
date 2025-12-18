@@ -27,7 +27,7 @@ This system aims to automate and optimize core healthcare management tasks using
 - **AI Diagnostics:** Preliminary diagnosis suggestions based on patient symptoms and history.
 - **Prescription Management:** Doctor-issued prescriptions, tracking, and notifications.
 - **Analytics Dashboard:** Visual reports on clinic/hospital performance and patient outcomes.
-- **Role-Based Access:** Separate dashboards for doctors, nurses, admins, and patients.
+- **Role-Based Access:** Separate dashboards for doctors, admins, and patients.
 - **Secure Messaging:** Encrypted communication between healthcare providers and patients.
 
 ## Tech Stack

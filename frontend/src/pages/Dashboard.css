@@ -12,7 +12,6 @@ nav {
   top: 0;
   z-index: 50;
   backdrop-filter: blur(8px);
-  background: rgba(255, 255, 255, 0.95);
 }
 
 /* Role Switcher Styles */
@@ -54,7 +53,7 @@ nav {
 .search-container {
   position: relative;
   max-width: 400px;
-}
+} 
 
 .search-input {
   width: 100%;
@@ -199,7 +198,7 @@ nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: rgb(255, 255, 255);
   font-weight: 500;
   font-size: 0.875rem;
   transition: transform 0.2s ease;
@@ -224,12 +223,12 @@ nav {
 }
 
 .btn-primary {
-  background: #3b82f6;
-  color: white;
+  background: #3b83f6;
+  color: rgb(255, 255, 255);
 }
 
 .btn-primary:hover {
-  background: #2563eb;
+  background: #2564eb;
   transform: translateY(-1px);
 }
 
@@ -322,79 +321,6 @@ nav {
   }
 }
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .dashboard-container {
-    background: #0f172a;
-  }
-  
-  nav {
-    background: rgba(30, 41, 59, 0.95);
-    border-bottom-color: #334155;
-  }
-  
-  .role-switcher {
-    background: #334155;
-  }
-  
-  .role-tab.active {
-    background: #475569;
-    color: #f1f5f9;
-  }
-  
-  .role-tab:not(.active) {
-    color: #94a3b8;
-  }
-  
-  .role-tab:not(.active):hover {
-    color: #f1f5f9;
-  }
-  
-  .search-input {
-    background: #475569;
-    border-color: #64748b;
-    color: #f1f5f9;
-  }
-  
-  .search-input:focus {
-    border-color: #60a5fa;
-  }
-  
-  .notifications-dropdown,
-  .profile-menu {
-    background: #334155;
-    border-color: #475569;
-  }
-  
-  .notification-item {
-    border-bottom-color: #475569;
-    color: #f1f5f9;
-  }
-  
-  .notification-item:hover {
-    background-color: #475569;
-  }
-  
-  .notification-item.unread {
-    background-color: #1e3a8a;
-  }
-  
-  .notification-item.unread:hover {
-    background-color: #1e40af;
-  }
-  
-  .profile-menu-item {
-    color: #f1f5f9;
-  }
-  
-  .profile-menu-item:hover {
-    background-color: #475569;
-  }
-  
-  .profile-menu-divider {
-    background-color: #475569;
-  }
-}
 
 /* Accessibility Improvements */
 @media (prefers-reduced-motion: reduce) {
@@ -407,7 +333,7 @@ nav {
 
 /* Focus Indicators */
 .focus-visible:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #3b83f6;
   outline-offset: 2px;
 }
 
