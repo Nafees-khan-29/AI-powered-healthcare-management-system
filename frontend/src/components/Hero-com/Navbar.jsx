@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useLayoutEffect } from 'react'
 import healthLogo from '../../assets/healthlogo.avif'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
@@ -40,11 +40,13 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
+  // Use layoutEffect for synchronous updates before paint
+  useLayoutEffect(() => {
     const currentPath = location.pathname === '/' ? 'home' : location.pathname.replace('/', '');
+    
     if (navItems.includes(currentPath)) {
       setActiveItem(currentPath);
-    } else if (currentPath === 'dashboard') {
+    } else if (location.pathname.includes('/dashboard')) {
       setActiveItem('dashboard');
     }
   }, [location.pathname]);
@@ -52,9 +54,9 @@ const Navbar = () => {
   // Handle dashboard navigation based on role
   const handleDashboardClick = () => {
     if (userRole) {
+      setActiveItem('dashboard');
       const dashboardPath = getDashboardPath(userRole);
       navigate(dashboardPath);
-      setActiveItem('dashboard');
     }
   };
 
@@ -90,7 +92,7 @@ const Navbar = () => {
               alt="Health Care Logo" 
               className="h-16 w-16 object-contain transform group-hover:scale-105 transition-transform duration-300"
             />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl sm:text-3xl font-bold text-blue-950">
               Medicare
             </h1>
           </div>
@@ -101,10 +103,10 @@ const Navbar = () => {
               <div key={item} className="relative">
                 <button
                   onClick={() => handleNavClick(item)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold uppercase tracking-wide transition-all duration-300 ${
+                  className={`py-2 px-4 border-b-2 font-semibold text-sm transition-all rounded-t-lg uppercase tracking-wide ${
                     activeItem === item
-                      ? 'text-white bg-blue-600 shadow-lg'
-                      : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+                      ? 'text-blue-900 border-b-4 border-blue-900'
+                      : 'text-blue-900/70 hover:text-blue-900 border-transparent'
                   }`}
                 >
                   {item}
@@ -116,7 +118,11 @@ const Navbar = () => {
               {userRole && (
                 <button
                   onClick={handleDashboardClick}
-                  className="px-5 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-semibold shadow-lg hover:shadow-xl transition-transform hover:-translate-y-0.5"
+                  className={`py-2 px-4 border-b-2 font-semibold text-sm transition-all rounded-t-lg uppercase tracking-wide ${
+                    activeItem === 'dashboard'
+                      ? 'text-blue-900 border-b-4 border-blue-900'
+                      : 'text-blue-900/70 hover:text-blue-900 border-transparent'
+                  }`}
                 >
                   {getDashboardLabel()}
                 </button>
@@ -129,9 +135,9 @@ const Navbar = () => {
             <SignedOut>
               <button 
                 onClick={() => navigate('/login')} 
-                className="bg-blue-600 text-white px-6 py-2.5 rounded-full text-base font-medium
-                  hover:bg-blue-700 transform hover:scale-105 transition-all duration-300
-                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-md"
+                className="bg-blue-950 text-white px-6 py-2.5 rounded-full text-base font-medium
+                  hover:bg-blue-950 transform hover:scale-105 transition-all duration-300
+                  focus:outline-none focus:ring-2 focus:ring-blue-950 focus:ring-offset-2 shadow-md"
               >
                 Login 
               </button>
@@ -141,7 +147,7 @@ const Navbar = () => {
                 afterSignOutUrl="/"
                 appearance={{
                   elements: {
-                    avatarBox: "w-10 h-10 rounded-full border-2 border-blue-500 hover:border-blue-600 transition-all duration-300 shadow-md"
+                    avatarBox: "w-10 h-10 rounded-full border-2 border-blue-900 hover:border-blue-950 transition-all duration-300 shadow-md"
                   }
                 }}
               />
@@ -186,10 +192,11 @@ const Navbar = () => {
             <div key={item}>
               <button
                 onClick={() => {
+                  setActiveItem(item);
                   navigate(item === 'home' ? '/' : `/${item}`);
                   closeMobileMenu();
                 }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold uppercase tracking-wide transition-colors ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold uppercase tracking-wide transition-colors duration-150 ${
                   activeItem === item
                     ? 'text-white bg-blue-900 shadow-lg'
                     : 'text-gray-900 bg-blue-50/80 hover:bg-blue-50'
@@ -207,7 +214,11 @@ const Navbar = () => {
                   handleDashboardClick();
                   closeMobileMenu();
                 }}
-                className="w-full px-4 py-3 rounded-2xl text-sm font-semibold bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold uppercase tracking-wide transition-colors duration-150 ${
+                  activeItem === 'dashboard'
+                    ? 'text-white bg-blue-900 shadow-lg'
+                    : 'text-gray-900 bg-blue-50/80 hover:bg-blue-50'
+                }`}
               >
                 {getDashboardLabel()}
               </button>

@@ -1,72 +1,18 @@
 /* User Dashboard Styles */
 .user-dashboard {
   min-height: 100vh;
-  background: linear-gradient(to bottom, #5ab0ff 0%, #c9def0 45%, #ffffff 100%);
-  padding: 0;
-  position: relative;
-  overflow-x: hidden;
-}
-
-/* Inner wrapper with proper top padding */
-.user-dashboard > div {
-  padding: 0 2rem 2rem 2rem;
-  padding-top: 6rem; /* Space for fixed navbar (5rem/80px) + extra spacing */
-  position: relative;
-  z-index: 1;
-}
-
-/* Decorative blobs - Hero style */
-.user-dashboard::before {
-  content: '';
-  position: absolute;
-  top: -4rem;
-  right: -4rem;
-  width: 14rem;
-  height: 14rem;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  filter: blur(3rem);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.user-dashboard::after {
-  content: '';
-  position: absolute;
-  top: 6rem;
-  left: -5rem;
-  width: 16rem;
-  height: 16rem;
-  background: rgba(191, 219, 254, 0.3);
-  border-radius: 50%;
-  filter: blur(3rem);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Tab Navigation Wrapper - Sticky */
-.dashboard-tabs-wrapper {
-  position: sticky;
-  top: 5rem; /* Height of navbar (80px = 5rem) */
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(242, 242, 242, 0) 100%);
-  /* backdrop-filter: blur(12px); */
-  z-index: 10;
-  margin: 0 -2rem 1.5rem -2rem;
-  padding: 0 2rem 0 2rem;
-  /* border-bottom: 2px solid rgba(255, 255, 255, 0.3); */
-  /* box-shadow: 0 4px 12px rgb(159, 21, 21); */
+  background: linear-gradient(180deg, #e8f3ff 0%, #f6f9ff 45%, #ffffff 100%);
+  padding: 2rem;
 }
 
 /* Tab Styles */
 .tab-content {
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  border-radius: 166px;
+  border-radius: 16px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   padding: 2rem;
   min-height: 500px;
   border: 1px solid #e5e7eb;
-  position: relative;
-  z-index: 1;
 }
 
 /* Search Bar Styles */
@@ -709,6 +655,39 @@
   
   .welcome-section h2 {
     font-size: 1.5rem;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .user-dashboard {
+    background: linear-gradient(180deg, #e8f3ff 0%, #f6f9ff 45%, #ffffff 100%);
+  }
+  
+  .tab-content,
+  .dashboard-card,
+  .modal-content,
+  .appointment-card,
+  .medical-record-card,
+  .prescription-card,
+  .metric-card {
+    background: white;
+    color: #0f172a;
+  }
+  
+  .form-input,
+  .filter-select {
+    background: white;
+    color: #0f172a;
+    border-color: #e5e7eb;
+  }
+  
+  .form-input:focus {
+    border-color: #3b82f6;
+  }
+  
+  .welcome-section {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
   }
 }
 
