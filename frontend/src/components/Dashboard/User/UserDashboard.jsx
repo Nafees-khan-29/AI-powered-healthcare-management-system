@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { getUserAppointments, updateAppointmentStatus, cancelAppointment, updateAppointment } from '../../../services/appointmentService';
 import { getPatientMedicalRecords, getPatientPrescriptions } from '../../../services/medicalRecordService';
-import { addHealthMetric, getLatestHealthMetrics, getUserHealthMetrics, deleteHealthMetric } from '../../../services/healthMetricService';
+import { getUserHealthMetrics, getLatestHealthMetrics, addHealthMetric } from '../../../services/healthMetricService';
 import { createEmergencyAlert, getPatientAlerts } from '../../../services/emergencyAlertService';
 import Navbar from '../../Hero-com/Navbar';
+import Footer from '../../Hero-com/Footer';
 import { 
   FaCalendarAlt, 
   FaUser, 
@@ -31,7 +32,15 @@ import {
   FaExclamationTriangle,
   FaTimes,
   FaArrowRight,
-  FaArrowLeft
+  FaArrowLeft,
+  FaAmbulance,
+  FaHome,
+  FaComments,
+  FaQuestionCircle,
+  FaChartLine,
+  FaSignOutAlt,
+  FaSpinner,
+  FaSave
 } from 'react-icons/fa';
 import './UserDashboard.css';
 
@@ -167,6 +176,16 @@ const UserDashboard = () => {
     };
   }, [user, isLoaded]);
 
+  // Fetch health metrics on load
+  useEffect(() => {
+    fetchHealthMetrics();
+  }, [user, isLoaded]);
+
+  // Fetch emergency alerts on load
+  useEffect(() => {
+    fetchEmergencyAlerts();
+  }, [user, isLoaded]);
+
   // Function to fetch appointments (can be called manually)
   const fetchAppointments = async () => {
     if (!isLoaded || !user) return;
@@ -195,7 +214,12 @@ const UserDashboard = () => {
           patientName: apt.patientName,
           patientEmail: apt.patientEmail,
           patientPhone: apt.patientPhone,
+          patientAge: apt.patientAge,
+          patientGender: apt.patientGender,
           additionalNotes: apt.additionalNotes,
+          emergencyContact: apt.emergencyContact,
+          insuranceProvider: apt.insuranceProvider,
+          previousConditions: apt.previousConditions,
           medicalReports: apt.medicalReports || []
         }));
       
@@ -395,35 +419,67 @@ const UserDashboard = () => {
   const fetchHealthMetrics = async () => {
     if (!isLoaded || !user) return;
     
-    setIsLoadingMetrics(true);
+    setIsLoadingHealthMetrics(true);
     try {
       console.log('📥 Fetching health metrics for user:', user.id);
-      const response = await getLatestHealthMetrics(user.id);
-      console.log('✅ Health metrics response:', response);
       
-      if (response.success && response.metrics) {
-        const metrics = response.metrics;
+      // Get latest health metrics
+      const latestResponse = await getLatestHealthMetrics(user.id);
+      console.log('✅ Latest health metrics:', latestResponse);
+      
+      if (latestResponse.success && latestResponse.metrics) {
+        const metrics = latestResponse.metrics;
+        
+        // Format blood pressure from systolic/diastolic
+        const bloodPressure = metrics.bloodPressureSystolic && metrics.bloodPressureDiastolic
+          ? `${metrics.bloodPressureSystolic}/${metrics.bloodPressureDiastolic}`
+          : 'N/A';
+        
+        // Calculate BMI if weight and height are available
+        const bmi = metrics.weight && metrics.height
+          ? (metrics.weight / Math.pow(metrics.height / 100, 2)).toFixed(1)
+          : 'N/A';
+        
         setHealthMetrics({
-          bloodPressure: metrics.bloodPressureSystolic && metrics.bloodPressureDiastolic 
-            ? `${metrics.bloodPressureSystolic}/${metrics.bloodPressureDiastolic}` 
-            : '--/--',
-          heartRate: metrics.heartRate ? `${metrics.heartRate} bpm` : '-- bpm',
-          temperature: metrics.temperature ? `${metrics.temperature}°F` : '-- °F',
-          weight: metrics.weight ? `${metrics.weight} kg` : '-- kg',
-          height: metrics.height ? `${metrics.height} cm` : '-- cm',
-          bmi: metrics.bmi ? metrics.bmi.toString() : '--'
+          bloodPressure: bloodPressure,
+          heartRate: metrics.heartRate ? `${metrics.heartRate} bpm` : 'N/A',
+          temperature: metrics.temperature ? `${metrics.temperature}°F` : 'N/A',
+          weight: metrics.weight ? `${metrics.weight} kg` : 'N/A',
+          height: metrics.height ? `${metrics.height} cm` : 'N/A',
+          bmi: bmi,
+          oxygenLevel: metrics.oxygenSaturation ? `${metrics.oxygenSaturation}%` : 'N/A'
+        });
+      } else {
+        // Set default values if no metrics found
+        setHealthMetrics({
+          bloodPressure: 'No data',
+          heartRate: 'No data',
+          temperature: 'No data',
+          weight: 'No data',
+          height: 'No data',
+          bmi: 'No data',
+          oxygenLevel: 'No data'
         });
       }
       
-      // Also fetch history
-      const historyResponse = await getUserHealthMetrics(user.id, { limit: 10 });
+      // Get health metrics history
+      const historyResponse = await getUserHealthMetrics(user.id, { limit: 30 });
       if (historyResponse.success) {
-        setHealthHistory(historyResponse.metrics);
+        setHealthMetricsHistory(historyResponse.metrics || []);
       }
     } catch (error) {
       console.error('❌ Error fetching health metrics:', error);
+      setHealthMetrics({
+        bloodPressure: 'Error',
+        heartRate: 'Error',
+        temperature: 'Error',
+        weight: 'Error',
+        height: 'Error',
+        bmi: 'Error',
+        oxygenLevel: 'Error'
+      });
     } finally {
-      setIsLoadingMetrics(false);
+      setIsLoadingHealthMetrics(false);
     }
   };
 
@@ -435,25 +491,18 @@ const UserDashboard = () => {
     try {
       console.log('📥 Fetching emergency alerts for user:', user.id);
       const response = await getPatientAlerts(user.id);
-      console.log('✅ Emergency alerts response:', response);
+      console.log('✅ Emergency alerts:', response);
       
       if (response.success) {
-        setEmergencyAlerts(response.alerts);
+        setEmergencyAlerts(response.alerts || []);
       }
     } catch (error) {
       console.error('❌ Error fetching emergency alerts:', error);
+      setEmergencyAlerts([]);
     } finally {
       setIsLoadingAlerts(false);
     }
   };
-
-  // Fetch health metrics and alerts on mount
-  useEffect(() => {
-    if (activeTab === 'health-tracking') {
-      fetchHealthMetrics();
-      fetchEmergencyAlerts();
-    }
-  }, [activeTab, user, isLoaded]);
 
   // Medical records state
   const [medicalRecords, setMedicalRecords] = useState([]);
@@ -463,42 +512,30 @@ const UserDashboard = () => {
   const [prescriptions, setPrescriptions] = useState([]);
   const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false);
 
-  // Health Metrics State
+  // Health metrics state - now dynamic
   const [healthMetrics, setHealthMetrics] = useState({
-    bloodPressure: '--/--',
-    heartRate: '-- bpm',
-    temperature: '-- °F',
-    weight: '-- kg',
-    height: '-- cm',
-    bmi: '--'
+    bloodPressure: 'Loading...',
+    heartRate: 'Loading...',
+    temperature: 'Loading...',
+    weight: 'Loading...',
+    height: 'Loading...',
+    bmi: 'Loading...',
+    oxygenLevel: 'Loading...'
   });
-  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
-  const [healthHistory, setHealthHistory] = useState([]);
-  const [showAddMetricModal, setShowAddMetricModal] = useState(false);
-  const [newMetric, setNewMetric] = useState({
-    bloodPressureSystolic: '',
-    bloodPressureDiastolic: '',
-    heartRate: '',
-    temperature: '',
-    oxygenSaturation: '',
-    weight: '',
-    height: '',
-    bloodSugar: '',
-    bloodSugarType: 'random',
-    cholesterol: '',
-    notes: ''
-  });
+  const [isLoadingHealthMetrics, setIsLoadingHealthMetrics] = useState(true);
+  const [healthMetricsHistory, setHealthMetricsHistory] = useState([]);
 
-  // Emergency Alert State
-  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  // Emergency alert state
   const [emergencyAlerts, setEmergencyAlerts] = useState([]);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
-  const [emergencyData, setEmergencyData] = useState({
-    emergencyType: '',
-    severity: 'medium',
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyFormData, setEmergencyFormData] = useState({
+    emergencyType: 'breathing_difficulty',
+    severity: 'critical',
+    patientPhone: '',
+    patientEmail: '',
     description: '',
     location: '',
-    phoneNumber: '',
     currentVitals: {
       bloodPressure: '',
       heartRate: '',
@@ -506,14 +543,25 @@ const UserDashboard = () => {
       oxygenLevel: ''
     }
   });
+  const [isSendingAlert, setIsSendingAlert] = useState(false);
+
+  // Health metrics form state
+  const [metricsFormData, setMetricsFormData] = useState({
+    bloodPressure: '',
+    heartRate: '',
+    temperature: '',
+    weight: '',
+    height: '',
+    oxygenLevel: ''
+  });
+  const [isUpdatingMetrics, setIsUpdatingMetrics] = useState(false);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FaUser },
     { id: 'appointments', label: 'Appointments', icon: FaCalendarAlt },
     { id: 'medical-records', label: 'Medical Records', icon: FaFileMedical },
     { id: 'prescriptions', label: 'Prescriptions', icon: FaPills },
-    { id: 'health-tracking', label: 'Health Tracking', icon: FaHeartbeat },
-    { id: 'emergency-alerts', label: 'Emergency Alerts', icon: FaBell }
+    { id: 'health-tracking', label: 'Health Tracking', icon: FaHeartbeat }
   ];
 
   const handleTabChange = (tabId) => {
@@ -542,6 +590,25 @@ const UserDashboard = () => {
     });
   };
 
+  // Open emergency modal with pre-filled user data
+  const openEmergencyModal = () => {
+    setEmergencyFormData({
+      emergencyType: 'breathing_difficulty',
+      severity: 'critical',
+      patientPhone: user?.primaryPhoneNumber?.phoneNumber || user?.phoneNumber || '',
+      patientEmail: user?.primaryEmailAddress?.emailAddress || '',
+      description: '',
+      location: '',
+      currentVitals: {
+        bloodPressure: '',
+        heartRate: '',
+        temperature: '',
+        oxygenLevel: ''
+      }
+    });
+    setShowEmergencyModal(true);
+  };
+
   const handleAppointmentAction = (action, appointment) => {
     switch (action) {
       case 'cancel':
@@ -557,63 +624,387 @@ const UserDashboard = () => {
     }
   };
 
-  const renderOverview = () => {
-    // Check for active video call link
-    const activeVideoCallAlert = emergencyAlerts.find(alert => 
-      alert.videoCallLink && alert.status !== 'resolved'
-    );
+  // Handle emergency alert form changes
+  const handleEmergencyFormChange = (field, value) => {
+    if (field.startsWith('currentVitals.')) {
+      const vitalField = field.split('.')[1];
+      setEmergencyFormData(prev => ({
+        ...prev,
+        currentVitals: {
+          ...prev.currentVitals,
+          [vitalField]: value
+        }
+      }));
+    } else {
+      setEmergencyFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
+  };
 
-    return (
-    <div className="space-y-6">
-      {/* Active Video Call Notification */}
-      {activeVideoCallAlert && (
-        <div className="bg-gradient-to-r from-green-500 via-green-600 to-green-700 rounded-2xl p-6 text-white shadow-2xl border-4 border-green-400 animate-pulse">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <FaVideo className="text-5xl animate-bounce" />
-              <div>
-                <h2 className="text-2xl font-bold mb-1">🎥 Video Call Available!</h2>
-                <p className="text-white/90 text-lg">
-                  {activeVideoCallAlert.doctorName || 'A doctor'} is waiting to connect with you
-                </p>
-              </div>
-            </div>
-            <a
-              href={activeVideoCallAlert.videoCallLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 bg-white text-green-600 hover:bg-green-50 font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg"
-            >
-              Join Now
-            </a>
+  // Send emergency alert
+  const handleSendEmergencyAlert = async () => {
+    if (!emergencyFormData.description.trim()) {
+      alert('Please provide a description of the emergency');
+      return;
+    }
+
+    if (!emergencyFormData.patientPhone.trim()) {
+      alert('Please provide a phone number for contact');
+      return;
+    }
+
+    if (!emergencyFormData.patientEmail.trim()) {
+      alert('Please provide an email address');
+      return;
+    }
+
+    setIsSendingAlert(true);
+    try {
+      const alertData = {
+        patientId: user.id,
+        patientEmail: emergencyFormData.patientEmail,
+        patientName: user.fullName || user.firstName + ' ' + user.lastName,
+        patientPhone: emergencyFormData.patientPhone,
+        emergencyType: emergencyFormData.emergencyType,
+        severity: emergencyFormData.severity,
+        description: emergencyFormData.description,
+        location: emergencyFormData.location,
+        currentVitals: emergencyFormData.currentVitals
+      };
+
+      console.log('🚨 Sending emergency alert:', alertData);
+      const response = await createEmergencyAlert(alertData);
+      console.log('✅ Emergency alert sent:', response);
+
+      alert('Emergency alert sent successfully! A doctor will respond shortly.');
+      
+      // Reset form and close modal
+      setEmergencyFormData({
+        emergencyType: 'breathing_difficulty',
+        severity: 'critical',
+        patientPhone: '',
+        patientEmail: '',
+        description: '',
+        location: '',
+        currentVitals: {
+          bloodPressure: '',
+          heartRate: '',
+          temperature: '',
+          oxygenLevel: ''
+        }
+      });
+      setShowEmergencyModal(false);
+
+      // Refresh alerts list
+      fetchEmergencyAlerts();
+    } catch (error) {
+      console.error('❌ Error sending emergency alert:', error);
+      alert('Failed to send emergency alert: ' + error.message);
+    } finally {
+      setIsSendingAlert(false);
+    }
+  };
+
+  // Handle health metrics form changes
+  const handleMetricsFormChange = (field, value) => {
+    setMetricsFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle health metrics update
+  const handleUpdateHealthMetrics = async (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!metricsFormData.bloodPressure && !metricsFormData.heartRate && 
+        !metricsFormData.temperature && !metricsFormData.weight && 
+        !metricsFormData.height && !metricsFormData.oxygenLevel) {
+      alert('Please fill in at least one health metric');
+      return;
+    }
+
+    setIsUpdatingMetrics(true);
+    try {
+      // Parse blood pressure into systolic and diastolic
+      let bloodPressureSystolic, bloodPressureDiastolic;
+      if (metricsFormData.bloodPressure) {
+        const bpParts = metricsFormData.bloodPressure.split('/');
+        if (bpParts.length === 2) {
+          bloodPressureSystolic = parseInt(bpParts[0].trim());
+          bloodPressureDiastolic = parseInt(bpParts[1].trim());
+        }
+      }
+
+      // Parse numeric values
+      const heartRate = metricsFormData.heartRate ? parseFloat(metricsFormData.heartRate) : undefined;
+      const temperature = metricsFormData.temperature ? parseFloat(metricsFormData.temperature) : undefined;
+      const oxygenSaturation = metricsFormData.oxygenLevel ? parseFloat(metricsFormData.oxygenLevel) : undefined;
+      const weight = metricsFormData.weight ? parseFloat(metricsFormData.weight) : undefined;
+      const height = metricsFormData.height ? parseFloat(metricsFormData.height) : undefined;
+
+      const metricsData = {
+        userId: user.id,
+        userEmail: user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress,
+        userName: user.fullName || `${user.firstName} ${user.lastName}`,
+        bloodPressureSystolic,
+        bloodPressureDiastolic,
+        heartRate,
+        temperature,
+        oxygenSaturation,
+        weight,
+        height,
+        source: 'manual'
+      };
+
+      console.log('📊 Updating health metrics:', metricsData);
+      const response = await addHealthMetric(metricsData);
+      console.log('✅ Health metrics updated:', response);
+
+      alert('Health metrics updated successfully!');
+      
+      // Reset form
+      setMetricsFormData({
+        bloodPressure: '',
+        heartRate: '',
+        temperature: '',
+        weight: '',
+        height: '',
+        oxygenLevel: ''
+      });
+      closeModal();
+
+      // Refresh health metrics
+      fetchHealthMetrics();
+    } catch (error) {
+      console.error('❌ Error updating health metrics:', error);
+      alert('Failed to update health metrics: ' + error.message);
+    } finally {
+      setIsUpdatingMetrics(false);
+    }
+  };
+
+  const renderOverview = () => (
+    <div className="overview-container">
+      {/* Summary Cards Row */}
+      <div className="summary-cards-row">
+        <div className="summary-card blue">
+          <div className="card-icon">
+            <FaCalendarAlt />
+          </div>
+          <div className="card-content">
+            <h3 className="card-title">Upcoming</h3>
+            <p className="card-value">
+              {appointments.filter(apt => apt.status === 'confirmed' || apt.status === 'pending').length}
+            </p>
+            <p className="card-subtitle">Appointments</p>
           </div>
         </div>
-      )}
-
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-400 rounded-2xl p-6 text-white shadow-lg">
-        <h2 className="text-2xl font-bold mb-2">Welcome back, {user?.name || 'Patient'}!</h2>
-        <p className="text-white/90">Here's your health summary for today</p>
+        
+        <div className="summary-card green">
+          <div className="card-icon">
+            <FaPills />
+          </div>
+          <div className="card-content">
+            <h3 className="card-title">Active</h3>
+            <p className="card-value">{prescriptions.filter(p => p.status === 'active').length}</p>
+            <p className="card-subtitle">Prescriptions</p>
+          </div>
+        </div>
+        
+        <div className="summary-card purple">
+          <div className="card-icon">
+            <FaFileMedical />
+          </div>
+          <div className="card-content">
+            <h3 className="card-title">Medical</h3>
+            <p className="card-value">{medicalRecords.length}</p>
+            <p className="card-subtitle">Records</p>
+          </div>
+        </div>
+        
+        <div className="summary-card orange">
+          <div className="card-icon">
+            <FaHeartbeat />
+          </div>
+          <div className="card-content">
+            <h3 className="card-title">BMI</h3>
+            <p className="card-value">{healthMetrics.bmi !== 'Loading...' && healthMetrics.bmi !== 'No data' ? healthMetrics.bmi : 'N/A'}</p>
+            <p className="card-subtitle">Health Metric</p>
+          </div>
+        </div>
       </div>
 
+      {/* Content Grid */}
+      <div className="content-grid">
+        {/* Next Appointment Card */}
+        <div className="content-card">
+          <div className="card-header">
+            <h3 className="card-heading">
+              <FaCalendarAlt className="inline mr-2 text-blue-600" />
+              Next Appointment
+            </h3>
+            <button 
+              onClick={() => setActiveTab('appointments')}
+              className="view-all-btn"
+            >
+              View All
+            </button>
+          </div>
+          <div className="card-body">
+            {isLoadingAppointments ? (
+              <div className="loading-state">
+                <div className="spinner"></div>
+                <p>Loading appointments...</p>
+              </div>
+            ) : (() => {
+              // Get the most recent upcoming appointment (pending, booked, or confirmed)
+              const upcomingAppointments = appointments
+                .filter(apt => ['pending', 'booked', 'confirmed'].includes(apt.status))
+                .sort((a, b) => {
+                  const dateA = new Date(a.date);
+                  const dateB = new Date(b.date);
+                  return dateA - dateB;
+                });
+              
+              const nextAppt = upcomingAppointments[0];
+              
+              return nextAppt ? (
+                <div className="appointment-item">
+                  <div className="appointment-icon">
+                    <FaUser className="text-2xl text-blue-600" />
+                  </div>
+                  <div className="appointment-details">
+                    <h4 className="appointment-doctor">{nextAppt.doctor}</h4>
+                    <p className="appointment-specialty">{nextAppt.specialty}</p>
+                    <div className="appointment-meta">
+                      <span className="meta-item">
+                        <FaClock className="mr-1" />
+                        {nextAppt.date} at {nextAppt.time}
+                      </span>
+                      <span className={`status-badge ${nextAppt.status}`}>
+                        {nextAppt.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <FaCalendarAlt className="empty-icon" />
+                  <p>No upcoming appointments</p>
+                  <button 
+                    onClick={() => setActiveTab('appointments')}
+                    className="btn-primary-sm"
+                  >
+                    Book Appointment
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Recent Activity Card */}
+        <div className="content-card">
+          <div className="card-header">
+            <h3 className="card-heading">
+              <FaChartLine className="inline mr-2 text-green-600" />
+              Recent Activity
+            </h3>
+          </div>
+          <div className="card-body">
+            <div className="activity-list">
+              {emergencyAlerts.slice(0, 3).map((alert, idx) => (
+                <div key={idx} className="activity-item">
+                  <div className={`activity-dot ${alert.severity}`}></div>
+                  <div className="activity-content">
+                    <p className="activity-title">{alert.emergencyType.replace(/_/g, ' ')}</p>
+                    <p className="activity-time">{new Date(alert.alertSentAt).toLocaleDateString()}</p>
+                  </div>
+                  <span className={`activity-status ${alert.status}`}>
+                    {alert.status}
+                  </span>
+                </div>
+              ))}
+              {appointments.slice(0, 2).map((apt, idx) => (
+                <div key={`apt-${idx}`} className="activity-item">
+                  <div className="activity-dot blue"></div>
+                  <div className="activity-content">
+                    <p className="activity-title">Appointment with {apt.doctor}</p>
+                    <p className="activity-time">{apt.date}</p>
+                  </div>
+                  <span className={`activity-status ${apt.status}`}>
+                    {apt.status}
+                  </span>
+                </div>
+              ))}
+              {emergencyAlerts.length === 0 && appointments.length === 0 && (
+                <div className="empty-state-sm">
+                  <p>No recent activity</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Health Metrics Overview */}
+      <div className="content-card full-width">
+        <div className="card-header">
+          <h3 className="card-heading">
+            <FaHeartbeat className="inline mr-2 text-red-600" />
+            Health Metrics Overview
+          </h3>
+          <button 
+            onClick={() => setActiveTab('health-tracking')}
+            className="view-all-btn"
+          >
+            View Details
+          </button>
+        </div>
+        <div className="card-body">
+          <div className="metrics-grid">
+            <div className="metric-item">
+              <span className="metric-label">Blood Pressure</span>
+              <span className="metric-value">{healthMetrics.bloodPressure}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Heart Rate</span>
+              <span className="metric-value">{healthMetrics.heartRate}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Temperature</span>
+              <span className="metric-value">{healthMetrics.temperature}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Weight</span>
+              <span className="metric-value">{healthMetrics.weight}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Height</span>
+              <span className="metric-value">{healthMetrics.height}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Oxygen Level</span>
+              <span className="metric-value">{healthMetrics.oxygenLevel}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderOverviewOld = () => (
+    <div className="space-y-6">
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="stat-card primary">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium opacity-90">Upcoming</p>
-              <p className="text-3xl font-bold">
-                {appointments.filter(apt => apt.status === 'confirmed' || apt.status === 'pending').length}
-              </p>
-            </div>
-            <FaCalendarAlt className="text-4xl opacity-80" />
-          </div>
-        </div>
-        
-        <div className="stat-card success">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium opacity-90">Active Rx</p>
               <p className="text-3xl font-bold">
                 {prescriptions.filter(rx => rx.status === 'active').length}
               </p>
@@ -656,42 +1047,56 @@ const UserDashboard = () => {
             <FaExclamationCircle className="text-3xl mx-auto mb-2" />
             <p className="text-sm">Unable to load appointments</p>
           </div>
-        ) : appointments.find(apt => apt.status === 'confirmed') ? (
-          <div className="bg-blue-50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-semibold text-blue-900">
-                  {appointments.find(apt => apt.status === 'confirmed')?.doctor}
-                </h4>
-                <p className="text-blue-800">
-                  {appointments.find(apt => apt.status === 'confirmed')?.specialty}
-                </p>
-                <p className="text-blue-700 text-sm">
-                  {appointments.find(apt => apt.status === 'confirmed')?.date} at{' '}
-                  {appointments.find(apt => apt.status === 'confirmed')?.time}
-                </p>
-                <p className="text-blue-700 text-sm">
-                  {appointments.find(apt => apt.status === 'confirmed')?.location}
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="status-badge confirmed">Confirmed</span>
+        ) : (() => {
+          // Get the most recent upcoming appointment (pending, booked, or confirmed)
+          const upcomingAppointments = appointments
+            .filter(apt => ['pending', 'booked', 'confirmed'].includes(apt.status))
+            .sort((a, b) => {
+              const dateA = new Date(a.date);
+              const dateB = new Date(b.date);
+              return dateA - dateB;
+            });
+          
+          const nextAppt = upcomingAppointments[0];
+          
+          return nextAppt ? (
+            <div className="bg-blue-50 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-blue-900">
+                    {nextAppt.doctor}
+                  </h4>
+                  <p className="text-blue-800">
+                    {nextAppt.specialty}
+                  </p>
+                  <p className="text-blue-700 text-sm">
+                    {nextAppt.date} at {nextAppt.time}
+                  </p>
+                  <p className="text-blue-700 text-sm">
+                    {nextAppt.location || 'Consultation'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className={`status-badge ${nextAppt.status}`}>
+                    {nextAppt.status}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <FaCalendarAlt className="text-4xl mx-auto mb-4 text-gray-300" />
-            <p>No upcoming appointments</p>
-            <button 
-              onClick={() => navigate('/appointment')}
-              className="btn-primary mt-4"
-            >
-              <FaPlus className="mr-2" />
-              Book Appointment
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <FaCalendarAlt className="text-4xl mx-auto mb-4 text-gray-300" />
+              <p>No upcoming appointments</p>
+              <button 
+                onClick={() => navigate('/appointment')}
+                className="btn-primary mt-4"
+              >
+                <FaPlus className="mr-2" />
+                Book Appointment
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Recent Activity */}
@@ -699,7 +1104,7 @@ const UserDashboard = () => {
         <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
         <div className="space-y-3">
           {medicalRecords.slice(0, 3).map((record) => (
-            <div key={record.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div key={record.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border">
               <div className={`w-2 h-2 rounded-full ${
                 record.status === 'completed' ? 'bg-cyan-500' : 'bg-blue-500'
               }`} />
@@ -717,13 +1122,15 @@ const UserDashboard = () => {
         </div>
       </div>
     </div>
-    );
-  };
+  );
 
   const renderAppointments = () => (
-    <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+    <div className="content-card full-width">
+      <div className="card-header">
+        <h3 className="card-heading">
+          <FaCalendarAlt className="inline mr-2 text-blue-600" />
+          My Appointments
+        </h3>
         <div className="flex gap-4">
           <select className="filter-select">
             <option value="all">All Status</option>
@@ -732,15 +1139,16 @@ const UserDashboard = () => {
             <option value="cancelled">Cancelled</option>
             <option value="completed">Completed</option>
           </select>
+          <button 
+            onClick={() => navigate('/appointment')}
+            className="btn-primary flex items-center gap-2"
+          >
+            <FaPlus />
+            Book New
+          </button>
         </div>
-        <button 
-          onClick={() => navigate('/appointment')}
-          className="btn-primary flex items-center gap-2"
-        >
-          <FaPlus />
-          Book Appointment
-        </button>
       </div>
+      <div className="card-body">
 
       {/* Appointments List */}
       <div className="space-y-4">
@@ -776,8 +1184,39 @@ const UserDashboard = () => {
               Book Appointment
             </button>
           </div>
-        ) : (
-          appointments.map((appointment) => (
+        ) : (() => {
+          const filteredAppointments = appointments.filter(appointment => {
+            if (!searchQuery.trim()) return true;
+            const query = searchQuery.toLowerCase().trim();
+            return (
+              appointment.doctor?.toLowerCase().includes(query) ||
+              appointment.specialty?.toLowerCase().includes(query) ||
+              appointment.date?.toLowerCase().includes(query) ||
+              appointment.time?.toLowerCase().includes(query) ||
+              appointment.status?.toLowerCase().includes(query) ||
+              appointment.location?.toLowerCase().includes(query) ||
+              appointment.notes?.toLowerCase().includes(query) ||
+              appointment.symptoms?.toLowerCase().includes(query)
+            );
+          });
+
+          if (filteredAppointments.length === 0 && searchQuery.trim()) {
+            return (
+              <div className="dashboard-card p-12 text-center text-gray-500">
+                <FaSearch className="text-5xl mx-auto mb-4 text-gray-300" />
+                <p className="text-lg mb-2">No appointments found</p>
+                <p className="text-sm">Try adjusting your search criteria</p>
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Clear Search
+                </button>
+              </div>
+            );
+          }
+
+          return filteredAppointments.map((appointment) => (
             <div key={appointment.id} className="dashboard-card p-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="flex-1">
@@ -804,6 +1243,12 @@ const UserDashboard = () => {
                     </div>
                     {appointment.notes && (
                       <p className="text-gray-700 mt-2 text-sm">{appointment.notes}</p>
+                    )}
+                    {appointment.medicalReports && appointment.medicalReports.length > 0 && (
+                      <div className="flex items-center gap-2 mt-2 text-sm text-blue-600">
+                        <FaFileMedical />
+                        <span>{appointment.medicalReports.length} Medical Report{appointment.medicalReports.length > 1 ? 's' : ''} Attached</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -845,16 +1290,20 @@ const UserDashboard = () => {
               </div>
             </div>
           </div>
-          ))
-        )}
+          ));
+        })()}
+      </div>
       </div>
     </div>
   );
 
   const renderMedicalRecords = () => (
-    <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+    <div className="content-card full-width">
+      <div className="card-header">
+        <h3 className="card-heading">
+          <FaFileMedical className="inline mr-2 text-cyan-600" />
+          Medical Records
+        </h3>
         <div className="flex gap-4">
           <select className="filter-select">
             <option value="all">All Types</option>
@@ -863,15 +1312,16 @@ const UserDashboard = () => {
             <option value="ecg">ECG</option>
             <option value="mri">MRI</option>
           </select>
+          <button 
+            onClick={() => openModal('uploadRecord')}
+            className="btn-primary flex items-center gap-2"
+          >
+            <FaUpload />
+            Upload
+          </button>
         </div>
-        <button 
-          onClick={() => openModal('uploadRecord')}
-          className="btn-primary flex items-center gap-2"
-        >
-          <FaUpload />
-          Upload Record
-        </button>
       </div>
+      <div className="card-body">
 
       {/* Medical Records List */}
       <div className="space-y-4">
@@ -934,13 +1384,17 @@ const UserDashboard = () => {
           ))
         )}
       </div>
+      </div>
     </div>
   );
 
   const renderPrescriptions = () => (
-    <div className="space-y-6">
-      {/* Header Actions */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+    <div className="content-card full-width">
+      <div className="card-header">
+        <h3 className="card-heading">
+          <FaPills className="inline mr-2 text-green-600" />
+          My Prescriptions
+        </h3>
         <div className="flex gap-4">
           <select className="filter-select">
             <option value="all">All Status</option>
@@ -948,17 +1402,17 @@ const UserDashboard = () => {
             <option value="completed">Completed</option>
             <option value="expired">Expired</option>
           </select>
+          <button 
+            onClick={() => openModal('requestRefill')}
+            className="btn-primary flex items-center gap-2"
+          >
+            <FaPlus />
+            Request Refill
+          </button>
         </div>
-        <button 
-          onClick={() => openModal('requestRefill')}
-          className="btn-primary flex items-center gap-2"
-        >
-          <FaPlus />
-          Request Refill
-        </button>
       </div>
-
-      {/* Prescriptions List */}
+      <div className="card-body">
+        {/* Prescriptions List */}
       <div className="space-y-4">
         {isLoadingPrescriptions ? (
           <div className="dashboard-card p-12 text-center">
@@ -1021,458 +1475,224 @@ const UserDashboard = () => {
           ))
         )}
       </div>
+      </div>
     </div>
   );
-
-  // Handle add health metric
-  const handleAddHealthMetric = async () => {
-    try {
-      const metricData = {
-        userId: user.id,
-        userEmail: user.primaryEmailAddress?.emailAddress,
-        userName: user.fullName,
-        ...newMetric
-      };
-
-      await addHealthMetric(metricData);
-      alert('Health metric added successfully!');
-      setShowAddMetricModal(false);
-      setNewMetric({
-        bloodPressureSystolic: '',
-        bloodPressureDiastolic: '',
-        heartRate: '',
-        temperature: '',
-        oxygenSaturation: '',
-        weight: '',
-        height: '',
-        bloodSugar: '',
-        bloodSugarType: 'random',
-        cholesterol: '',
-        notes: ''
-      });
-      fetchHealthMetrics();
-    } catch (error) {
-      alert('Failed to add health metric: ' + error.message);
-    }
-  };
-
-  // Handle delete health metric
-  const handleDeleteHealthMetric = async (metricId) => {
-    if (!window.confirm('Are you sure you want to delete this health record? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      await deleteHealthMetric(metricId);
-      alert('Health record deleted successfully!');
-      fetchHealthMetrics();
-    } catch (error) {
-      alert('Failed to delete health record: ' + error.message);
-    }
-  };
-
-  // Handle send emergency alert
-  const handleSendEmergencyAlert = async () => {
-    if (!emergencyData.emergencyType || !emergencyData.description) {
-      alert('Please select emergency type and provide description');
-      return;
-    }
-
-    if (!emergencyData.phoneNumber || emergencyData.phoneNumber.length !== 10) {
-      alert('Please enter a valid 10-digit phone number');
-      return;
-    }
-
-    try {
-      const alertData = {
-        patientId: user.id,
-        patientEmail: user.primaryEmailAddress?.emailAddress,
-        patientName: user.fullName,
-        patientPhone: emergencyData.phoneNumber,
-        ...emergencyData
-      };
-
-      await createEmergencyAlert(alertData);
-      alert('🚨 Emergency alert sent successfully! A doctor will contact you shortly.');
-      setShowEmergencyModal(false);
-      setEmergencyData({
-        emergencyType: '',
-        severity: 'medium',
-        description: '',
-        location: '',
-        phoneNumber: '',
-        currentVitals: {
-          bloodPressure: '',
-          heartRate: '',
-          temperature: '',
-          oxygenLevel: ''
-        }
-      });
-      fetchEmergencyAlerts();
-    } catch (error) {
-      alert('Failed to send emergency alert: ' + error.message);
-    }
-  };
 
   const renderHealthTracking = () => (
     <div className="space-y-6">
       {/* Emergency Alert Button */}
-      <div className="dashboard-card bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-red-700 mb-2">🚨 Emergency Alert</h3>
-            <p className="text-sm text-red-600">Need immediate medical attention? Alert your doctor now</p>
+      <div className="content-card full-width">
+        <div className="card-body">
+          <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                  <FaAmbulance className="text-2xl" />
+                  Emergency Alert
+                </h3>
+                <p className="text-white/90">Need immediate medical assistance? Send an alert to available doctors.</p>
+              </div>
+              <button
+                onClick={openEmergencyModal}
+                className="bg-white text-red-600 px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors shadow-lg flex items-center gap-2"
+              >
+                <FaExclamationCircle />
+                Send Emergency Alert
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowEmergencyModal(true)}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all transform hover:scale-105 shadow-lg"
-          >
-            Send Emergency Alert
-          </button>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-4">
-        <button
-          onClick={() => setShowAddMetricModal(true)}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all flex items-center gap-2"
-        >
-          <FaPlus /> Add Health Metric
-        </button>
-        <button
-          onClick={fetchHealthMetrics}
-          className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {isLoadingMetrics ? (
-        <div className="dashboard-card p-12 text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-          <p className="text-gray-600">Loading health metrics...</p>
+      {/* Health Metrics */}
+      <div className="content-card full-width">
+        <div className="card-header">
+          <h3 className="card-heading">
+            <FaHeartbeat className="inline mr-2 text-red-600" />
+            Health Metrics
+          </h3>
         </div>
-      ) : (
-        <>
-          {/* Health Metrics */}
+        <div className="card-body">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="dashboard-card p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FaHeartbeat className="text-blue-600" />
-                Vital Signs
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span>Blood Pressure</span>
-                  <span className="font-semibold">{healthMetrics.bloodPressure}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Heart Rate</span>
-                  <span className="font-semibold">{healthMetrics.heartRate}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Temperature</span>
-                  <span className="font-semibold">{healthMetrics.temperature}</span>
-                </div>
-              </div>
+        <div className="dashboard-card p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <FaHeartbeat className="text-blue-600" />
+            Vital Signs
+          </h3>
+          {isLoadingHealthMetrics ? (
+            <div className="text-center py-4">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
-
-            <div className="dashboard-card p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FaUser className="text-cyan-600" />
-                Body Metrics
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span>Weight</span>
-                  <span className="font-semibold">{healthMetrics.weight}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Height</span>
-                  <span className="font-semibold">{healthMetrics.height}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>BMI</span>
-                  <span className="font-semibold">{healthMetrics.bmi}</span>
-                </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span>Blood Pressure</span>
+                <span className="font-semibold">{healthMetrics.bloodPressure}</span>
               </div>
-            </div>
-
-            <div className="dashboard-card p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FaExclamationCircle className="text-orange-600" />
-                Emergency Alerts
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span>Total Sent</span>
-                  <span className="font-semibold">{emergencyAlerts.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Pending</span>
-                  <span className="font-semibold text-orange-600">
-                    {emergencyAlerts.filter(a => a.status === 'pending').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Resolved</span>
-                  <span className="font-semibold text-green-600">
-                    {emergencyAlerts.filter(a => a.status === 'resolved').length}
-                  </span>
-                </div>
+              <div className="flex justify-between">
+                <span>Heart Rate</span>
+                <span className="font-semibold">{healthMetrics.heartRate}</span>
               </div>
-            </div>
-          </div>
-
-          {/* Health History */}
-          {healthHistory.length > 0 && (
-            <div className="dashboard-card p-6">
-              <h3 className="text-lg font-semibold mb-4">Recent Health Records</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Date</th>
-                      <th className="text-left py-2">BP</th>
-                      <th className="text-left py-2">Heart Rate</th>
-                      <th className="text-left py-2">Temp</th>
-                      <th className="text-left py-2">Weight</th>
-                      <th className="text-left py-2">Notes</th>
-                      <th className="text-right py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {healthHistory.slice(0, 5).map((record, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
-                        <td className="py-2">{new Date(record.recordedAt).toLocaleDateString()}</td>
-                        <td className="py-2">
-                          {record.bloodPressureSystolic && record.bloodPressureDiastolic
-                            ? `${record.bloodPressureSystolic}/${record.bloodPressureDiastolic}`
-                            : '--'}
-                        </td>
-                        <td className="py-2">{record.heartRate ? `${record.heartRate} bpm` : '--'}</td>
-                        <td className="py-2">{record.temperature ? `${record.temperature}°F` : '--'}</td>
-                        <td className="py-2">{record.weight ? `${record.weight} kg` : '--'}</td>
-                        <td className="py-2 text-sm text-gray-600">
-                          {record.notes ? (record.notes.length > 30 ? record.notes.substring(0, 30) + '...' : record.notes) : '--'}
-                        </td>
-                        <td className="py-2 text-right">
-                          <button
-                            onClick={() => handleDeleteHealthMetric(record._id)}
-                            className="text-red-600 hover:text-red-800 p-2 rounded hover:bg-red-50 transition-colors"
-                            title="Delete Record"
-                          >
-                            <FaTrash />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex justify-between">
+                <span>Temperature</span>
+                <span className="font-semibold">{healthMetrics.temperature}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Oxygen Level</span>
+                <span className="font-semibold">{healthMetrics.oxygenLevel}</span>
               </div>
             </div>
           )}
-        </>
-      )}
-    </div>
-  );
-
-  const renderEmergencyAlerts = () => {
-    const getSeverityColor = (severity) => {
-      switch (severity) {
-        case 'critical': return 'bg-red-100 border-red-300 text-red-800';
-        case 'high': return 'bg-orange-100 border-orange-300 text-orange-800';
-        case 'medium': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-        case 'low': return 'bg-blue-100 border-blue-300 text-blue-800';
-        default: return 'bg-gray-100 border-gray-300 text-gray-800';
-      }
-    };
-
-    const getStatusColor = (status) => {
-      switch (status) {
-        case 'pending': return 'bg-red-100 text-red-800';
-        case 'acknowledged': return 'bg-yellow-100 text-yellow-800';
-        case 'responded': return 'bg-blue-100 text-blue-800';
-        case 'resolved': return 'bg-green-100 text-green-800';
-        default: return 'bg-gray-100 text-gray-800';
-      }
-    };
-
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Emergency Alerts</h2>
-            <p className="text-gray-600 mt-1">Track your emergency alerts and responses</p>
-          </div>
-          <button
-            onClick={() => setShowEmergencyModal(true)}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all transform hover:scale-105 shadow-lg inline-flex items-center gap-2"
-          >
-            <FaBell /> Send New Alert
-          </button>
         </div>
 
-        {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="dashboard-card bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-red-600 text-sm font-medium">Total Alerts</p>
-                <p className="text-3xl font-bold text-red-700">{emergencyAlerts.length}</p>
-              </div>
-              <FaBell className="text-4xl text-red-400" />
+        <div className="dashboard-card p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <FaUser className="text-cyan-600" />
+            Body Metrics
+          </h3>
+          {isLoadingHealthMetrics ? (
+            <div className="text-center py-4">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
             </div>
-          </div>
-          
-          <div className="dashboard-card bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-yellow-600 text-sm font-medium">Pending</p>
-                <p className="text-3xl font-bold text-yellow-700">
-                  {emergencyAlerts.filter(a => a.status === 'pending').length}
-                </p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span>Weight</span>
+                <span className="font-semibold">{healthMetrics.weight}</span>
               </div>
-              <FaExclamationTriangle className="text-4xl text-yellow-400" />
+              <div className="flex justify-between">
+                <span>Height</span>
+                <span className="font-semibold">{healthMetrics.height}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>BMI</span>
+                <span className="font-semibold">{healthMetrics.bmi}</span>
+              </div>
+              <button
+                onClick={() => openModal('updateMetrics')}
+                className="w-full mt-3 btn-secondary text-sm"
+              >
+                <FaPlus className="inline mr-1" />
+                Update Metrics
+              </button>
             </div>
-          </div>
-          
-          <div className="dashboard-card bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-600 text-sm font-medium">Responded</p>
-                <p className="text-3xl font-bold text-blue-700">
-                  {emergencyAlerts.filter(a => a.status === 'responded' || a.status === 'acknowledged').length}
-                </p>
-              </div>
-              <FaCheckCircle className="text-4xl text-blue-400" />
+          )}
+        </div>
+
+        <div className="dashboard-card p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <FaBell className="text-blue-600" />
+            Reminders
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <FaCheckCircle className="text-cyan-600" />
+              <span>Take morning medication</span>
             </div>
-          </div>
-          
-          <div className="dashboard-card bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-600 text-sm font-medium">Resolved</p>
-                <p className="text-3xl font-bold text-green-700">
-                  {emergencyAlerts.filter(a => a.status === 'resolved').length}
-                </p>
-              </div>
-              <FaCheckCircle className="text-4xl text-green-400" />
+            <div className="flex items-center gap-2 text-sm">
+              <FaClock className="text-blue-600" />
+              <span>Blood pressure check</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <FaExclamationTriangle className="text-blue-600" />
+              <span>Schedule follow-up</span>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Alerts List */}
+      {/* Emergency Alerts History */}
+      <div className="dashboard-card p-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <FaAmbulance className="text-red-600" />
+          Emergency Alerts History
+        </h3>
         {isLoadingAlerts ? (
-          <div className="dashboard-card p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading alerts...</p>
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-red-500"></div>
+            <p className="text-gray-600 mt-4">Loading alerts...</p>
           </div>
         ) : emergencyAlerts.length === 0 ? (
-          <div className="dashboard-card p-12 text-center">
-            <FaBell className="text-5xl text-gray-300 mx-auto mb-4" />
-            <p className="text-lg text-gray-600 mb-2">No emergency alerts sent yet</p>
-            <p className="text-sm text-gray-500">Your emergency alerts will appear here</p>
+          <div className="bg-white rounded-lg p-8 text-center border">
+            <FaAmbulance className="text-4xl mx-auto mb-4 text-gray-300" />
+            <p className="text-gray-700">No emergency alerts sent</p>
+            <p className="text-sm text-gray-600">Your emergency alert history will appear here</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {emergencyAlerts.map(alert => (
-              <div key={alert._id} className={`dashboard-card border-2 ${getSeverityColor(alert.severity)} p-6`}>
-                <div className="flex items-start justify-between mb-4">
+            {emergencyAlerts.slice(0, 5).map((alert) => (
+              <div 
+                key={alert._id} 
+                className={`border-l-4 p-4 rounded-lg ${
+                  alert.severity === 'critical' ? 'border-red-500 bg-red-50' :
+                  alert.severity === 'high' ? 'border-orange-500 bg-orange-50' :
+                  alert.severity === 'medium' ? 'border-yellow-500 bg-yellow-50' :
+                  'border-blue-500 bg-blue-50'
+                }`}
+              >
+                <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(alert.status)}`}>
-                        {alert.status}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        alert.severity === 'critical' ? 'bg-red-600 text-white' :
+                        alert.severity === 'high' ? 'bg-orange-600 text-white' :
+                        alert.severity === 'medium' ? 'bg-yellow-600 text-white' :
+                        'bg-blue-600 text-white'
+                      }`}>
+                        {alert.severity.toUpperCase()}
                       </span>
-                      <span className="px-3 py-1 bg-white rounded-full text-xs font-bold uppercase border-2">
-                        {alert.severity}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {new Date(alert.alertSentAt).toLocaleString()}
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        alert.status === 'acknowledged' ? 'bg-yellow-200 text-yellow-800' :
+                        alert.status === 'responded' ? 'bg-blue-200 text-blue-800' :
+                        alert.status === 'resolved' ? 'bg-green-200 text-green-800' :
+                        'bg-white text-gray-800 border'
+                      }`}>
+                        {alert.status === 'acknowledged' ? 'ACKNOWLEDGED' :
+                         alert.status === 'responded' ? 'RESPONDED' :
+                         alert.status === 'resolved' ? 'RESOLVED' :
+                         'PENDING'}
                       </span>
                     </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    <h4 className="font-semibold text-gray-900 mb-1">
                       {alert.emergencyType.replace(/_/g, ' ').toUpperCase()}
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="bg-white bg-opacity-70 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold mb-2">Description:</h4>
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{alert.description}</p>
-                </div>
-
-                {alert.location && (
-                  <div className="bg-white bg-opacity-70 rounded-lg p-3 mb-4">
-                    <p className="text-sm"><strong>Location:</strong> {alert.location}</p>
-                  </div>
-                )}
-
-                {/* Video Call Link */}
-                {alert.videoCallLink && (
-                  <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-400 rounded-lg p-5 mb-4 shadow-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <FaVideo className="text-2xl text-green-600 animate-pulse" />
-                        <h4 className="font-bold text-green-900 text-lg">🎥 Video Call Available!</h4>
-                      </div>
-                      {alert.videoCallInitiatedAt && (
-                        <span className="text-xs text-green-700 bg-green-200 px-3 py-1 rounded-full">
-                          Initiated {new Date(alert.videoCallInitiatedAt).toLocaleTimeString()}
-                        </span>
+                    </h4>
+                    <p className="text-gray-700 text-sm mb-2">{alert.description}</p>
+                    <div className="text-xs text-gray-600">
+                      <p>📅 {new Date(alert.alertSentAt).toLocaleString()}</p>
+                      {alert.doctorName && (
+                        <p className="mt-1">👨‍⚕️ Handled by: {alert.doctorName}</p>
+                      )}
+                      {alert.acknowledgedAt && (
+                        <p className="mt-1">✓ Acknowledged: {new Date(alert.acknowledgedAt).toLocaleString()}</p>
                       )}
                     </div>
-                    <p className="text-sm text-green-800 mb-4">
-                      {alert.doctorName || 'A doctor'} has started a video call. Click the button below to join immediately.
-                    </p>
-                    <a
-                      href={alert.videoCallLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg"
-                    >
-                      <FaVideo className="text-xl" />
-                      Join Video Call Now
-                    </a>
-                    <div className="mt-3 p-3 bg-white rounded-lg border border-green-300">
-                      <p className="text-xs text-gray-600 mb-1">Or copy this link:</p>
-                      <code className="text-xs text-gray-800 break-all block bg-gray-50 p-2 rounded">
-                        {alert.videoCallLink}
-                      </code>
-                    </div>
                   </div>
-                )}
-
-                {alert.doctorName && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-semibold text-blue-900 mb-2">Doctor Response:</h4>
-                    <p className="text-sm text-blue-800 mb-2"><strong>Doctor:</strong> {alert.doctorName}</p>
-                    {alert.acknowledgedAt && (
-                      <p className="text-xs text-blue-600">Acknowledged at: {new Date(alert.acknowledgedAt).toLocaleString()}</p>
-                    )}
-                    {alert.response && (
-                      <>
-                        <p className="text-sm text-blue-800 mt-3">{alert.response}</p>
-                        <p className="text-xs text-blue-600 mt-2">Responded at: {new Date(alert.respondedAt).toLocaleString()}</p>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {alert.status === 'resolved' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <p className="text-sm text-green-800"><strong>✅ Resolved:</strong> {new Date(alert.resolvedAt).toLocaleString()}</p>
-                  </div>
-                )}
+                </div>
               </div>
             ))}
+            {emergencyAlerts.length > 5 && (
+              <p className="text-center text-sm text-gray-600">
+                Showing 5 of {emergencyAlerts.length} alerts
+              </p>
+            )}
           </div>
         )}
       </div>
-    );
-  };
+
+      {/* Health Trends Chart Placeholder */}
+      <div className="dashboard-card p-6">
+        <h3 className="text-lg font-semibold mb-4">Health Trends</h3>
+        <div className="bg-white rounded-lg p-8 text-center border">
+          <FaHeartbeat className="text-4xl mx-auto mb-4 text-blue-300" />
+          <p className="text-gray-700">Health trends chart will be displayed here</p>
+          <p className="text-sm text-gray-600">Track your progress over time</p>
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderModal = () => {
     if (!showModal) return null;
@@ -1489,7 +1709,7 @@ const UserDashboard = () => {
               
               <div className="space-y-6">
                 {/* Header Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded-lg border">
                   <div className="info-group">
                     <label className="info-label">Doctor</label>
                     <p className="info-value font-semibold text-blue-700">{selectedItem.doctor}</p>
@@ -1597,7 +1817,7 @@ const UserDashboard = () => {
                     <label className="info-label">Attached Medical Reports</label>
                     <div className="space-y-2">
                       {selectedItem.medicalReports.map((report, index) => (
-                        <div key={index} className="bg-gray-50 p-3 rounded-lg border">
+                        <div key={index} className="bg-white p-3 rounded-lg border">
                           <div className="flex items-center justify-between">
                             <div>
                               <p className="font-medium text-gray-900">{report.filename}</p>
@@ -1605,10 +1825,16 @@ const UserDashboard = () => {
                                 {(report.size / 1024).toFixed(2)} KB • {report.mimetype}
                               </p>
                             </div>
-                            <button className="btn-primary text-sm">
+                            <a 
+                              href={`http://localhost:3000/${report.path}`}
+                              download={report.filename}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-primary text-sm inline-flex items-center"
+                            >
                               <FaDownload className="mr-1" />
                               Download
-                            </button>
+                            </a>
                           </div>
                         </div>
                       ))}
@@ -1649,7 +1875,7 @@ const UserDashboard = () => {
               
               <div className="space-y-6">
                 {/* Doctor Information (Read-only) */}
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-white rounded-lg border">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Doctor Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="info-group">
@@ -1809,7 +2035,7 @@ const UserDashboard = () => {
               
               <div className="space-y-6">
                 {/* Header Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded-lg border">
                   <div className="info-group">
                     <label className="info-label">Report Type</label>
                     <p className="info-value font-semibold text-cyan-600">{selectedItem.type}</p>
@@ -1883,7 +2109,7 @@ const UserDashboard = () => {
                     <label className="info-label">Prescribed Medications</label>
                     <div className="space-y-3">
                       {selectedItem.prescriptions.map((prescription, index) => (
-                        <div key={index} className="bg-gray-50 p-4 rounded-lg border">
+                        <div key={index} className="bg-white p-4 rounded-lg border">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                               <h4 className="font-semibold text-gray-900">{prescription.medication}</h4>
@@ -1939,7 +2165,7 @@ const UserDashboard = () => {
               
               <div className="space-y-6">
                 {/* Header Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded-lg border">
                   <div className="info-group">
                     <label className="info-label">Medication</label>
                     <p className="info-value font-semibold text-purple-700">{selectedItem.medication}</p>
@@ -2010,7 +2236,7 @@ const UserDashboard = () => {
                 {selectedItem.medicalRecordId && (
                   <div className="info-group">
                     <label className="info-label">Related Medical Report</label>
-                    <div className="info-value bg-gray-50 p-3 rounded-lg">
+                    <div className="info-value bg-white p-3 rounded-lg border">
                       <p className="text-gray-600 text-sm">This prescription is part of a medical report</p>
                     </div>
                   </div>
@@ -2034,6 +2260,137 @@ const UserDashboard = () => {
                   </button>
                 )}
               </div>
+            </div>
+          );
+
+        case 'updateMetrics':
+          return (
+            <div className="modal-content max-w-2xl">
+              <h2 className="modal-title flex items-center gap-2">
+                <FaHeartbeat className="text-red-600" />
+                Update Health Metrics
+              </h2>
+              
+              <form onSubmit={handleUpdateHealthMetrics} className="space-y-6">
+                {/* Vital Signs Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Vital Signs</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="info-group">
+                      <label className="info-label">Blood Pressure (mmHg)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., 120/80"
+                        value={metricsFormData.bloodPressure}
+                        onChange={(e) => handleMetricsFormChange('bloodPressure', e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Format: systolic/diastolic</p>
+                    </div>
+
+                    <div className="info-group">
+                      <label className="info-label">Heart Rate (bpm)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., 72"
+                        value={metricsFormData.heartRate}
+                        onChange={(e) => handleMetricsFormChange('heartRate', e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Normal: 60-100 bpm</p>
+                    </div>
+
+                    <div className="info-group">
+                      <label className="info-label">Temperature (°F)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., 98.6"
+                        value={metricsFormData.temperature}
+                        onChange={(e) => handleMetricsFormChange('temperature', e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Normal: 97-99°F</p>
+                    </div>
+
+                    <div className="info-group">
+                      <label className="info-label">Oxygen Level (%)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., 98"
+                        value={metricsFormData.oxygenLevel}
+                        onChange={(e) => handleMetricsFormChange('oxygenLevel', e.target.value)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Normal: 95-100%</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Body Metrics Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Body Metrics</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="info-group">
+                      <label className="info-label">Weight (kg)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., 70"
+                        value={metricsFormData.weight}
+                        onChange={(e) => handleMetricsFormChange('weight', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="info-group">
+                      <label className="info-label">Height (cm)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g., 175"
+                        value={metricsFormData.height}
+                        onChange={(e) => handleMetricsFormChange('height', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                  <p className="text-sm text-gray-700">
+                    <strong>Note:</strong> Fill in the metrics you want to update. You don't need to fill all fields. 
+                    BMI will be calculated automatically if you provide weight and height.
+                  </p>
+                </div>
+
+                {/* Modal Actions */}
+                <div className="modal-actions">
+                  <button 
+                    type="button" 
+                    onClick={closeModal} 
+                    className="btn-secondary"
+                    disabled={isUpdatingMetrics}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn-primary"
+                    disabled={isUpdatingMetrics}
+                  >
+                    {isUpdatingMetrics ? (
+                      <>
+                        <FaSpinner className="mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <FaSave className="mr-2" />
+                        Update Metrics
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           );
 
@@ -2121,338 +2478,331 @@ const UserDashboard = () => {
 
   return (
     <>
-      {/* Navbar - positioned outside dashboard container */}
+      {/* Main Navigation at Top */}
       <Navbar />
       
-      <div className="user-dashboard">
-        {/* Add top padding to account for fixed navbar */}
-        <div className="pt-20">
-        {/* Header */}
-        <div className="mb-6 relative z-1">
-          <h1 className="text-3xl font-bold text-blue-950 mb-1">Patient Dashboard</h1>
-          <p className="text-gray-700/80">Manage your health and appointments</p>
+      <div className="dashboard-container">
+        {/* Left Sidebar */}
+        <aside className="dashboard-sidebar">
+        {/* Logo */}
+        <div className="sidebar-logo">
+          <div className="logo-container">
+            <FaHeartbeat className="text-3xl text-blue-600" />
+            <span className="logo-text">ProHealth</span>
+          </div>
         </div>
 
-      {/* Tabs */}
-      <div className="dashboard-tabs-wrapper">
-        <nav className="flex space-x-6 py-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`py-2 px-4 border-b-1 font-semibold text-sm transition-all rounded-t-lg ${
-                activeTab === tab.id
-                  ? ' text-black-700  border-b-4 border-blue-900 '
-                  : 'text-blue-900/70 hover:text-blue-900 '
-              }`}
-            >
-              <tab.icon className="inline mr-2" />
-              {tab.label}
-            </button>
-          ))}
+        {/* Navigation Menu */}
+        <nav className="sidebar-nav">
+          <button
+            onClick={() => handleTabChange('overview')}
+            className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+          >
+            <FaHome className="nav-icon" />
+            <span>Dashboard</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('appointments')}
+            className={`nav-item ${activeTab === 'appointments' ? 'active' : ''}`}
+          >
+            <FaCalendarAlt className="nav-icon" />
+            <span>Appointments</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('medical-records')}
+            className={`nav-item ${activeTab === 'medical-records' ? 'active' : ''}`}
+          >
+            <FaFileMedical className="nav-icon" />
+            <span>Medical Records</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('prescriptions')}
+            className={`nav-item ${activeTab === 'prescriptions' ? 'active' : ''}`}
+          >
+            <FaPills className="nav-icon" />
+            <span>Prescriptions</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('health-tracking')}
+            className={`nav-item ${activeTab === 'health-tracking' ? 'active' : ''}`}
+          >
+            <FaChartLine className="nav-icon" />
+            <span>Health Tracking</span>
+          </button>
+          
+          <button
+            className="nav-item"
+            onClick={() => alert('Messages feature coming soon')}
+          >
+            <FaComments className="nav-icon" />
+            <span>Messages</span>
+          </button>
+          
+          <button
+            className="nav-item"
+            onClick={() => alert('Help & Support')}
+          >
+            <FaQuestionCircle className="nav-icon" />
+            <span>Help</span>
+          </button>
         </nav>
-      </div>
 
-      {/* Tab Content */}
-      <div className="tab-content">
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'appointments' && renderAppointments()}
-        {activeTab === 'medical-records' && renderMedicalRecords()}
-        {activeTab === 'prescriptions' && renderPrescriptions()}
-        {activeTab === 'health-tracking' && renderHealthTracking()}
-        {activeTab === 'emergency-alerts' && renderEmergencyAlerts()}
-      </div>
+        {/* Logout Button */}
+        <div className="sidebar-footer">
+          <button
+            className="nav-item logout-btn"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to logout?')) {
+                navigate('/login');
+              }
+            }}
+          >
+            <FaSignOutAlt className="nav-icon" />
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="dashboard-main">
+        {/* Top Header */}
+        <header className="dashboard-header">
+          <div className="header-left">
+            <h1 className="page-title">
+              User Dashboard
+            </h1>
+          </div>
+          
+          <div className="header-right">
+            {/* Search Bar */}
+            <div className="header-search">
+              <FaSearch className="search-icon-header" />
+              <input
+                type="text"
+                placeholder="Search appointments by doctor, specialty, date, time, status..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="search-input-header"
+              />
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="dashboard-content">
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'appointments' && renderAppointments()}
+          {activeTab === 'medical-records' && renderMedicalRecords()}
+          {activeTab === 'prescriptions' && renderPrescriptions()}
+          {activeTab === 'health-tracking' && renderHealthTracking()}
+        </div>
+
+        {/* Footer */}
+        <Footer />
+      </main>
 
       {/* Modal */}
       {renderModal()}
 
-      {/* Add Health Metric Modal */}
-      {showAddMetricModal && (
-        <div className="modal-overlay" onClick={() => setShowAddMetricModal(false)}>
-          <div className="modal-container max-w-2xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-content">
-              <h2 className="modal-title flex items-center gap-2">
-                <FaHeartbeat className="text-blue-600" />
-                Add Health Metric
-              </h2>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">Blood Pressure Systolic</label>
-                    <input
-                      type="number"
-                      placeholder="120"
-                      className="form-input"
-                      value={newMetric.bloodPressureSystolic}
-                      onChange={(e) => setNewMetric({...newMetric, bloodPressureSystolic: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Blood Pressure Diastolic</label>
-                    <input
-                      type="number"
-                      placeholder="80"
-                      className="form-input"
-                      value={newMetric.bloodPressureDiastolic}
-                      onChange={(e) => setNewMetric({...newMetric, bloodPressureDiastolic: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Heart Rate (bpm)</label>
-                    <input
-                      type="number"
-                      placeholder="72"
-                      className="form-input"
-                      value={newMetric.heartRate}
-                      onChange={(e) => setNewMetric({...newMetric, heartRate: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Temperature (°F)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="98.6"
-                      className="form-input"
-                      value={newMetric.temperature}
-                      onChange={(e) => setNewMetric({...newMetric, temperature: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Weight (kg)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="70"
-                      className="form-input"
-                      value={newMetric.weight}
-                      onChange={(e) => setNewMetric({...newMetric, weight: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Height (cm)</label>
-                    <input
-                      type="number"
-                      placeholder="175"
-                      className="form-input"
-                      value={newMetric.height}
-                      onChange={(e) => setNewMetric({...newMetric, height: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Oxygen Saturation (%)</label>
-                    <input
-                      type="number"
-                      placeholder="98"
-                      className="form-input"
-                      value={newMetric.oxygenSaturation}
-                      onChange={(e) => setNewMetric({...newMetric, oxygenSaturation: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Blood Sugar</label>
-                    <input
-                      type="number"
-                      placeholder="100"
-                      className="form-input"
-                      value={newMetric.bloodSugar}
-                      onChange={(e) => setNewMetric({...newMetric, bloodSugar: e.target.value})}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="form-label">Notes (Optional)</label>
-                  <textarea
-                    className="form-input"
-                    rows="3"
-                    placeholder="Any additional notes..."
-                    value={newMetric.notes}
-                    onChange={(e) => setNewMetric({...newMetric, notes: e.target.value})}
-                  />
-                </div>
-
-                <div className="flex gap-4">
-                  <button onClick={handleAddHealthMetric} className="action-btn-primary">
-                    Save Metric
-                  </button>
-                  <button onClick={() => setShowAddMetricModal(false)} className="action-btn-secondary">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Emergency Alert Modal */}
       {showEmergencyModal && (
         <div className="modal-overlay" onClick={() => setShowEmergencyModal(false)}>
-          <div className="modal-container max-w-2xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-content">
+          <div className="modal-content max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
               <h2 className="modal-title flex items-center gap-2 text-red-600">
-                <FaExclamationTriangle className="text-red-600" />
-                🚨 Emergency Alert
+                <FaAmbulance className="text-2xl" />
+                Send Emergency Alert
               </h2>
-              
-              <div className="space-y-4">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-sm text-red-700">
-                    This will immediately notify available doctors. Use only for genuine medical emergencies.
-                  </p>
-                </div>
+              <button 
+                onClick={() => setShowEmergencyModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes className="text-2xl" />
+              </button>
+            </div>
 
-                <div className="grid grid-cols-2 gap-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-red-800 font-semibold flex items-center gap-2">
+                <FaExclamationTriangle />
+                This will immediately notify available doctors
+              </p>
+              <p className="text-red-700 text-sm mt-1">
+                Use this feature only for genuine medical emergencies that require immediate attention.
+              </p>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSendEmergencyAlert(); }} className="space-y-4">
+              {/* Patient Contact Information */}
+              <div className="border-b pb-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Contact Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="form-label">Emergency Type *</label>
-                    <select
+                    <label className="form-label">Phone Number *</label>
+                    <input 
+                      type="tel" 
                       className="form-input"
-                      value={emergencyData.emergencyType}
-                      onChange={(e) => setEmergencyData({...emergencyData, emergencyType: e.target.value})}
-                    >
-                      <option value="">Select emergency type</option>
-                      <option value="severe_pain">Severe Pain</option>
-                      <option value="breathing_difficulty">Breathing Difficulty</option>
-                      <option value="chest_pain">Chest Pain</option>
-                      <option value="high_fever">High Fever</option>
-                      <option value="bleeding">Bleeding</option>
-                      <option value="loss_of_consciousness">Loss of Consciousness</option>
-                      <option value="severe_allergic_reaction">Severe Allergic Reaction</option>
-                      <option value="mental_health_crisis">Mental Health Crisis</option>
-                      <option value="other">Other</option>
-                    </select>
+                      placeholder="Enter your phone number"
+                      value={emergencyFormData.patientPhone}
+                      onChange={(e) => handleEmergencyFormChange('patientPhone', e.target.value)}
+                      required
+                    />
                   </div>
                   <div>
-                    <label className="form-label">Severity *</label>
-                    <select
+                    <label className="form-label">Email Address *</label>
+                    <input 
+                      type="email" 
                       className="form-input"
-                      value={emergencyData.severity}
-                      onChange={(e) => setEmergencyData({...emergencyData, severity: e.target.value})}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="critical">Critical</option>
-                    </select>
+                      placeholder="Enter your email"
+                      value={emergencyFormData.patientEmail}
+                      onChange={(e) => handleEmergencyFormChange('patientEmail', e.target.value)}
+                      required
+                    />
                   </div>
-                </div>
-
-                <div>
-                  <label className="form-label">Description *</label>
-                  <textarea
-                    className="form-input"
-                    rows="4"
-                    placeholder="Describe your emergency in detail..."
-                    value={emergencyData.description}
-                    onChange={(e) => setEmergencyData({...emergencyData, description: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label">Current Location</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Your current location"
-                    value={emergencyData.location}
-                    onChange={(e) => setEmergencyData({...emergencyData, location: e.target.value})}
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label">Contact Phone Number <span className="text-red-500">*</span></label>
-                  <input
-                    type="tel"
-                    className="form-input"
-                    placeholder="Enter 10-digit phone number"
-                    maxLength="10"
-                    pattern="[0-9]{10}"
-                    value={emergencyData.phoneNumber}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      setEmergencyData({...emergencyData, phoneNumber: value});
-                    }}
-                    required
-                  />
-                  {emergencyData.phoneNumber && emergencyData.phoneNumber.length !== 10 && (
-                    <p className="text-red-500 text-sm mt-1">Phone number must be exactly 10 digits</p>
-                  )}
-                </div>
-
-                <div>
-                  <h4 className="font-semibold mb-2">Current Vitals (Optional)</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="form-label">Blood Pressure</label>
-                      <input
-                        type="text"
-                        placeholder="120/80"
-                        className="form-input"
-                        value={emergencyData.currentVitals.bloodPressure}
-                        onChange={(e) => setEmergencyData({
-                          ...emergencyData,
-                          currentVitals: {...emergencyData.currentVitals, bloodPressure: e.target.value}
-                        })}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Heart Rate</label>
-                      <input
-                        type="text"
-                        placeholder="72 bpm"
-                        className="form-input"
-                        value={emergencyData.currentVitals.heartRate}
-                        onChange={(e) => setEmergencyData({
-                          ...emergencyData,
-                          currentVitals: {...emergencyData.currentVitals, heartRate: e.target.value}
-                        })}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Temperature</label>
-                      <input
-                        type="text"
-                        placeholder="98.6°F"
-                        className="form-input"
-                        value={emergencyData.currentVitals.temperature}
-                        onChange={(e) => setEmergencyData({
-                          ...emergencyData,
-                          currentVitals: {...emergencyData.currentVitals, temperature: e.target.value}
-                        })}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label">Oxygen Level</label>
-                      <input
-                        type="text"
-                        placeholder="98%"
-                        className="form-input"
-                        value={emergencyData.currentVitals.oxygenLevel}
-                        onChange={(e) => setEmergencyData({
-                          ...emergencyData,
-                          currentVitals: {...emergencyData.currentVitals, oxygenLevel: e.target.value}
-                        })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button onClick={handleSendEmergencyAlert} className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-all">
-                    🚨 Send Emergency Alert
-                  </button>
-                  <button onClick={() => setShowEmergencyModal(false)} className="action-btn-secondary">
-                    Cancel
-                  </button>
                 </div>
               </div>
-            </div>
+
+              {/* Emergency Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Emergency Type *</label>
+                  <select 
+                    className="form-input"
+                    value={emergencyFormData.emergencyType}
+                    onChange={(e) => handleEmergencyFormChange('emergencyType', e.target.value)}
+                    required
+                  >
+                    <option value="breathing_difficulty">Breathing Difficulty</option>
+                    <option value="chest_pain">Chest Pain</option>
+                    <option value="bleeding">Severe Bleeding</option>
+                    <option value="loss_of_consciousness">Loss of Consciousness</option>
+                    <option value="severe_allergic_reaction">Severe Allergic Reaction</option>
+                    <option value="severe_pain">Severe Pain</option>
+                    <option value="high_fever">High Fever</option>
+                    <option value="mental_health_crisis">Mental Health Crisis</option>
+                    <option value="other">Other Emergency</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Severity Level *</label>
+                  <select 
+                    className="form-input"
+                    value={emergencyFormData.severity}
+                    onChange={(e) => handleEmergencyFormChange('severity', e.target.value)}
+                    required
+                  >
+                    <option value="critical">Critical (Life-threatening)</option>
+                    <option value="high">High (Urgent)</option>
+                    <option value="medium">Medium (Important)</option>
+                    <option value="low">Low (Non-urgent)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Description *</label>
+                <textarea 
+                  className="form-input" 
+                  rows="4"
+                  placeholder="Describe your emergency situation in detail..."
+                  value={emergencyFormData.description}
+                  onChange={(e) => handleEmergencyFormChange('description', e.target.value)}
+                  required
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="form-label">Current Location (Optional)</label>
+                <input 
+                  type="text" 
+                  className="form-input"
+                  placeholder="Your current address or location"
+                  value={emergencyFormData.location}
+                  onChange={(e) => handleEmergencyFormChange('location', e.target.value)}
+                />
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-gray-900 mb-3">Current Vitals (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="form-label">Blood Pressure</label>
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      placeholder="e.g., 120/80"
+                      value={emergencyFormData.currentVitals.bloodPressure}
+                      onChange={(e) => handleEmergencyFormChange('currentVitals.bloodPressure', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Heart Rate</label>
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      placeholder="e.g., 75 bpm"
+                      value={emergencyFormData.currentVitals.heartRate}
+                      onChange={(e) => handleEmergencyFormChange('currentVitals.heartRate', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Temperature</label>
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      placeholder="e.g., 98.6°F"
+                      value={emergencyFormData.currentVitals.temperature}
+                      onChange={(e) => handleEmergencyFormChange('currentVitals.temperature', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Oxygen Level</label>
+                    <input 
+                      type="text" 
+                      className="form-input"
+                      placeholder="e.g., 98%"
+                      value={emergencyFormData.currentVitals.oxygenLevel}
+                      onChange={(e) => handleEmergencyFormChange('currentVitals.oxygenLevel', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowEmergencyModal(false)} 
+                  className="btn-secondary flex-1"
+                  disabled={isSendingAlert}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-primary flex-1 bg-red-600 hover:bg-red-700 flex items-center justify-center gap-2"
+                  disabled={isSendingAlert}
+                >
+                  {isSendingAlert ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <FaAmbulance />
+                      Send Emergency Alert
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-        </div>
       </div>
     </>
   );

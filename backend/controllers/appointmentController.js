@@ -80,6 +80,7 @@ const createAppointment = async (req, res) => {
             emergencyContact,
             insuranceProvider,
             previousConditions,
+            consultationType,
             userId,
             clerkUserId
         } = req.body;
@@ -93,6 +94,7 @@ const createAppointment = async (req, res) => {
             appointmentDate,
             appointmentTime,
             symptoms,
+            consultationType,
             doctorName,
             doctorSpecialization,
             doctorEmail,
@@ -115,6 +117,7 @@ const createAppointment = async (req, res) => {
             emergencyContact,
             insuranceProvider,
             previousConditions,
+            consultationType: consultationType || 'offline',
             userId,
             clerkUserId
         };
@@ -328,6 +331,7 @@ const createAppointment = async (req, res) => {
             emergencyContact: sanitizedData.emergencyContact,
             insuranceProvider: sanitizedData.insuranceProvider,
             previousConditions: sanitizedData.previousConditions,
+            consultationType: sanitizedData.consultationType || 'offline',
             medicalReports,
             userId: sanitizedData.userId,
             clerkUserId: sanitizedData.clerkUserId,
@@ -447,7 +451,7 @@ const getDoctorAppointments = async (req, res) => {
 
         const appointments = await appointmentModel
             .find(query)
-            .sort({ appointmentDate: 1, appointmentTime: 1 });
+            .sort({ appointmentDate: -1, appointmentTime: -1 });
 
         console.log(`✅ Found ${appointments.length} appointments for doctor`);
 

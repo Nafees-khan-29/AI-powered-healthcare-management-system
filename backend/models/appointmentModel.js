@@ -88,6 +88,14 @@ const appointmentSchema = new mongoose.Schema(
             trim: true
         },
         
+        // Consultation Type
+        consultationType: {
+            type: String,
+            enum: ['online', 'offline'],
+            default: 'offline',
+            required: false
+        },
+        
         // Medical Reports/Files
         medicalReports: [{
             filename: String,

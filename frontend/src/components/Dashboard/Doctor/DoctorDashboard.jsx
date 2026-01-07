@@ -7,6 +7,7 @@ import { sendPatientVideoCallLink } from '../../../services/doctorService';
 import { getUserByEmail } from '../../../services/userService';
 import Navbar from '../../Hero-com/Navbar';
 import VideoCallRoom from '../../VideoCall/VideoCallRoom';
+import Footer from '../../Hero-com/Footer';
 import {
   FaUserMd,
   FaCalendarAlt,
@@ -44,7 +45,10 @@ import {
   FaVideo,
   FaPhoneAlt,
   FaComments,
-  FaPhoneSlash
+  FaPhoneSlash,
+  FaHome,
+  FaQuestionCircle,
+  FaHeartbeat
 } from 'react-icons/fa';
 import './DoctorDashboard.css';
 
@@ -652,6 +656,7 @@ const DoctorDashboard = () => {
   const [emergencyAlerts, setEmergencyAlerts] = useState([]);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState(null);
+  const [showAlertResponseModal, setShowAlertResponseModal] = useState(false);
 
   // State for emergency video call
   const [showVideoCall, setShowVideoCall] = useState(false);
@@ -676,6 +681,14 @@ const DoctorDashboard = () => {
       
       console.log('📥 Fetched appointments result:', result);
       console.log(`📊 Number of appointments fetched: ${result.appointments?.length || 0}`);
+      
+      // Log raw consultationType from API for debugging
+      if (result.appointments?.length > 0) {
+        console.log('🔍 Raw appointment consultationTypes from API:');
+        result.appointments.slice(0, 5).forEach(apt => {
+          console.log(`  ${apt.patientName}: consultationType = ${apt.consultationType} (${typeof apt.consultationType})`);
+        });
+      }
       
       if (result.success) {
         // Transform API response to component format
@@ -702,6 +715,7 @@ const DoctorDashboard = () => {
         console.log('✅ Transformed appointments:', transformedAppointments);
         console.log('📝 Statuses:', transformedAppointments.map(a => `${a.patientName}: ${a.status}`));
         console.log('📧 Patient emails in appointments:', transformedAppointments.map(a => `${a.patientName}: ${a.email || 'NO EMAIL'}`));
+        console.log('🌐 Consultation types:', transformedAppointments.map(a => `${a.patientName}: ${a.consultationType}`));
         
         setAppointments(transformedAppointments);
 
@@ -852,7 +866,7 @@ const DoctorDashboard = () => {
   }, []);
 
   // Handle appointment status update
-  const handleStatusUpdate = async (appointmentId, newStatus) => {
+  const handleStatusUpdate = async (appointmentId, newStatus, closeModalAfter = false) => {
     console.log('🖱️ Button clicked! handleStatusUpdate triggered');
     console.log(`🔄 Updating appointment ${appointmentId} to status: ${newStatus}`);
     console.log(`📊 Current appointments count BEFORE update: ${appointments.length}`);
@@ -904,6 +918,12 @@ const DoctorDashboard = () => {
           alert(`Appointment ${newStatus === 'booked' ? 'booked' : newStatus === 'completed' ? 'completed' : 'updated'} successfully!\nNote: ${cancelledCount} other pending appointment(s) for the same slot were cancelled.` + (emails.length ? `\nCancelled patients: ${emails.join(', ')}` : ''));
         } else {
           alert(`Appointment ${newStatus === 'booked' ? 'booked' : newStatus === 'completed' ? 'completed' : 'updated'} successfully! Patient will be notified.`);
+        }
+
+        // Close modal and switch to appointments tab if requested
+        if (closeModalAfter) {
+          closeModal();
+          setActiveTab('appointments');
         }
       } else {
         console.error('❌ Update failed:', result.message);
@@ -961,7 +981,13 @@ const DoctorDashboard = () => {
     const confirmedAppointments = appointmentsData.filter(apt => 
       apt.status === 'confirmed' || apt.status === 'booked'
     );
-    console.log(`✅ Filtering patients: ${confirmedAppointments.length} confirmed appointments out of ${appointmentsData.length} total`);
+    console.log(`✅ Filtering patients: ${confirmedAppointments.length} confirmed/booked appointments out of ${appointmentsData.length} total`);
+    
+    // Log which appointments are confirmed/booked with their consultationType
+    console.log('📋 Confirmed/booked appointments with consultationType:');
+    confirmedAppointments.forEach(apt => {
+      console.log(`  - ${apt.patientName} (${apt.status}): consultationType = "${apt.consultationType}"`);
+    });
 
     // Compute unique patients - use data directly from confirmed appointments only
     const uniquePatients = {};
@@ -990,6 +1016,7 @@ const DoctorDashboard = () => {
           email: patientEmail,
           consultationType: apt.consultationType || 'offline',
           lastVisit: apt.date,
+          appointmentTime: apt.time,
           nextAppointment: null,
           status: 'active',
           medicalHistory: [],
@@ -1001,8 +1028,12 @@ const DoctorDashboard = () => {
     
     console.log('📊 Computed patients from appointments:', patientsArray.length);
     patientsArray.forEach(p => {
-      console.log(`  ✅ ${p.name}: email=${p.email}, phone=${p.phone}, age=${p.age}, gender=${p.gender}`);
+      console.log(`  ✅ ${p.name}: email=${p.email}, phone=${p.phone}, consultationType=${p.consultationType}`);
     });
+    
+    // Filter online patients
+    const onlinePatients = patientsArray.filter(p => p.consultationType === 'online');
+    console.log(`🌐 Online consultation patients: ${onlinePatients.length} out of ${patientsArray.length} total`);
     
     // Use patient data directly from appointments (already has email, phone, age, gender)
     setRealPatients(patientsArray);
@@ -1186,14 +1217,15 @@ const DoctorDashboard = () => {
   };
   
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: FaUserMd },
+    { id: 'overview', label: 'Dashboard', icon: FaHome },
     { id: 'appointments', label: 'Appointments', icon: FaCalendarAlt },
     { id: 'patients', label: 'Online Patients', icon: FaUsers },
     { id: 'medical-records', label: 'Medical Records', icon: FaFileMedical },
     { id: 'medical-reports', label: 'Medical Reports', icon: FaNotesMedical },
     { id: 'prescriptions', label: 'Prescriptions', icon: FaPills },
     { id: 'emergency-alerts', label: 'Emergency Alerts', icon: FaBell },
-    // { id: 'analytics', label: 'Analytics', icon: FaChartLine }
+    { id: 'messages', label: 'Messages', icon: FaComments },
+    { id: 'help', label: 'Help', icon: FaQuestionCircle }
   ];
 
   const handleTabChange = (tabId) => {
@@ -1216,7 +1248,7 @@ const DoctorDashboard = () => {
     console.log(`Action: ${action} for appointment ${appointmentId}`);
     
     if (action === 'confirm') {
-      handleStatusUpdate(appointmentId, 'booked');
+      handleStatusUpdate(appointmentId, 'booked', true);
     } else if (action === 'complete') {
       handleStatusUpdate(appointmentId, 'completed');
     } else if (action === 'reschedule') {
@@ -1380,7 +1412,7 @@ const DoctorDashboard = () => {
             <FaSearch className="search-icon" />
             <input
               type="text"
-              placeholder="Search appointments..."
+              placeholder="Search by patient name, email, phone, symptoms, date, or status..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
@@ -1492,7 +1524,18 @@ const DoctorDashboard = () => {
                     <div className="text-sm text-gray-500">{appointment.time}</div>
                   </td>
                   <td className="table-cell">
-                    <span className="appointment-type">{appointment.type}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="appointment-type">{appointment.type}</span>
+                      {appointment.medicalReports && appointment.medicalReports.length > 0 && (
+                        <span 
+                          className="text-xs text-blue-600 flex items-center gap-1 cursor-help" 
+                          title="Click 'View Details' to access patient medical reports"
+                        >
+                          <FaFileMedical />
+                          {appointment.medicalReports.length} Report{appointment.medicalReports.length > 1 ? 's' : ''} Attached
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="table-cell">
                     <span className={`status-badge ${getStatusBadge(appointment.status)}`}>
@@ -1791,6 +1834,19 @@ const DoctorDashboard = () => {
                         <p className="text-sm font-semibold text-gray-900">{patient.lastVisit || 'N/A'}</p>
                       </div>
                     </div>
+
+                    {/* Appointment Time */}
+                    {patient.appointmentTime && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <FaClock className="text-orange-600 text-sm" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500">Appointment Time</p>
+                          <p className="text-sm font-semibold text-gray-900">{patient.appointmentTime}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
@@ -2967,7 +3023,7 @@ const DoctorDashboard = () => {
       switch (modalType) {
         case 'appointment':
           return (
-            <div className="modal-content">
+            <div className="modal-content max-w-3xl">
               <h2 className="modal-title">Appointment Details</h2>
               <div className="space-y-4">
                 <div className="info-group">
@@ -2990,6 +3046,62 @@ const DoctorDashboard = () => {
                   <label className="info-label">Contact</label>
                   <p className="info-value">{selectedItem.phone} | {selectedItem.email}</p>
                 </div>
+                
+                {/* Medical Reports Section */}
+                {selectedItem.medicalReports && selectedItem.medicalReports.length > 0 && (
+                  <div className="info-group bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+                    <label className="info-label flex items-center gap-2 text-lg font-bold text-blue-900">
+                      <FaFileMedical className="text-blue-600 text-xl" />
+                      Patient Medical Reports ({selectedItem.medicalReports.length})
+                    </label>
+                    <p className="text-sm text-blue-700 mb-3 mt-1">
+                      📄 Files uploaded by patient during appointment booking
+                    </p>
+                    <div className="space-y-2 mt-2">
+                      {selectedItem.medicalReports.map((report, index) => (
+                        <div key={index} className="bg-blue-50 p-4 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900 flex items-center gap-2">
+                                <FaFileMedical className="text-blue-600" />
+                                {report.filename}
+                              </p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                Size: {(report.size / 1024).toFixed(2)} KB • Type: {report.mimetype}
+                              </p>
+                              {report.uploadedAt && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Uploaded: {new Date(report.uploadedAt).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <a 
+                                href={`http://localhost:3000/${report.path}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-primary text-sm inline-flex items-center gap-2"
+                                title="View file"
+                              >
+                                <FaEye />
+                                View
+                              </a>
+                              <a 
+                                href={`http://localhost:3000/${report.path}`}
+                                download={report.filename}
+                                className="btn-secondary text-sm inline-flex items-center gap-2"
+                                title="Download file"
+                              >
+                                <FaDownload />
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="modal-actions">
                 <button 
@@ -3428,11 +3540,30 @@ const DoctorDashboard = () => {
   const getFilteredAppointments = () => {
     let filtered = [...appointments];
     
-    // Search filter (by patient name)
+    // Enhanced search filter (by patient name, email, phone, symptoms, consultation type, date, time, status)
     if (searchQuery) {
-      filtered = filtered.filter(apt => 
-        apt.patientName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(apt => {
+        const patientName = apt.patientName?.toLowerCase() || '';
+        const patientEmail = apt.patientEmail?.toLowerCase() || '';
+        const patientPhone = apt.patientPhone?.toLowerCase() || '';
+        const symptoms = apt.symptoms?.toLowerCase() || '';
+        const consultationType = apt.type?.toLowerCase() || '';
+        const date = apt.date?.toLowerCase() || '';
+        const time = apt.time?.toLowerCase() || '';
+        const status = apt.status?.toLowerCase() || '';
+        const patientId = apt.patientId?.toLowerCase() || '';
+        
+        return patientName.includes(query) ||
+               patientEmail.includes(query) ||
+               patientPhone.includes(query) ||
+               symptoms.includes(query) ||
+               consultationType.includes(query) ||
+               date.includes(query) ||
+               time.includes(query) ||
+               status.includes(query) ||
+               patientId.includes(query);
+      });
     }
     
     // Status filter
@@ -3674,58 +3805,232 @@ const DoctorDashboard = () => {
         </div>
       )}
 
-      {/* Navbar - positioned outside dashboard container */}
+      {/* Main Navigation at Top */}
       <Navbar />
       
-      <div className="doctor-dashboard">{" "}
-        {/* Add top padding to account for fixed navbar */}
-        <div className="pt-20 ">
-        {/* Header */}
-        {/* <div className="">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Doctor Dashboard</h1>
-          <p className="text-gray-600">Manage your patients and practice</p>
-        </div> */}
+      <div className="dashboard-container">
+        {/* Left Sidebar */}
+        <aside className="dashboard-sidebar">
+          {/* Logo */}
+          <div className="sidebar-logo">
+            <div className="logo-container">
+              <FaHeartbeat className="text-3xl text-blue-600" />
+              <span className="logo-text">ProHealth</span>
+            </div>
+          </div>
 
-      {/* Tabs */}
-      <div className="mb-6 bg-white p-6">
-        <div className="border-b border-gray-200 bg-white">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <tab.icon className="inline mr-2" />
-                {tab.label}
-              </button>
-            ))}
+          {/* Navigation Menu */}
+          <nav className="sidebar-nav">
+            <button
+              onClick={() => handleTabChange('overview')}
+              className={`nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+            >
+              <FaHome className="nav-icon" />
+              <span>Dashboard</span>
+            </button>
+            
+            <button
+              onClick={() => handleTabChange('appointments')}
+              className={`nav-item ${activeTab === 'appointments' ? 'active' : ''}`}
+            >
+              <FaCalendarAlt className="nav-icon" />
+              <span>Appointments</span>
+            </button>
+            
+            <button
+              onClick={() => handleTabChange('patients')}
+              className={`nav-item ${activeTab === 'patients' ? 'active' : ''}`}
+            >
+              <FaUsers className="nav-icon" />
+              <span>Online Patients</span>
+            </button>
+            
+            <button
+              onClick={() => handleTabChange('medical-records')}
+              className={`nav-item ${activeTab === 'medical-records' ? 'active' : ''}`}
+            >
+              <FaFileMedical className="nav-icon" />
+              <span>Medical Records</span>
+            </button>
+            
+            <button
+              onClick={() => handleTabChange('medical-reports')}
+              className={`nav-item ${activeTab === 'medical-reports' ? 'active' : ''}`}
+            >
+              <FaNotesMedical className="nav-icon" />
+              <span>Medical Reports</span>
+            </button>
+            
+            <button
+              onClick={() => handleTabChange('prescriptions')}
+              className={`nav-item ${activeTab === 'prescriptions' ? 'active' : ''}`}
+            >
+              <FaPills className="nav-icon" />
+              <span>Prescriptions</span>
+            </button>
+            
+            <button
+              onClick={() => handleTabChange('emergency-alerts')}
+              className={`nav-item ${activeTab === 'emergency-alerts' ? 'active' : ''}`}
+            >
+              <FaBell className="nav-icon" />
+              <span>Emergency Alerts</span>
+            </button>
+            
+            <button
+              className="nav-item"
+              onClick={() => alert('Messages feature coming soon')}
+            >
+              <FaComments className="nav-icon" />
+              <span>Messages</span>
+            </button>
+            
+            <button
+              className="nav-item"
+              onClick={() => alert('Help & Support')}
+            >
+              <FaQuestionCircle className="nav-icon" />
+              <span>Help</span>
+            </button>
           </nav>
-        </div>
-      </div>
 
-      {/* Tab Content */}
-      <div className="tab-content bg-white">
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'appointments' && renderAppointments()}
-        {activeTab === 'patients' && renderPatients()}
-        {activeTab === 'medical-records' && renderMedicalRecords()}
-        {activeTab === 'medical-reports' && renderMedicalReports()}
-        {activeTab === 'prescriptions' && renderPrescriptions()}
-        {activeTab === 'emergency-alerts' && renderEmergencyAlerts()}
-        {/* {activeTab === 'analytics' && renderAnalytics()} */}
-      </div>
+          {/* Logout Button */}
+          <div className="sidebar-footer">
+            <button
+              className="nav-item logout-btn"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to logout?')) {
+                  window.location.href = '/login';
+                }
+              }}
+            >
+              <FaSignOutAlt className="nav-icon" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </aside>
 
-      {/* Modal */}
-      {renderModal()}
+        {/* Main Content Area */}
+        <main className="dashboard-main">
+          {/* Top Header */}
+          <header className="dashboard-header">
+            <div className="header-left">
+              <h1 className="page-title">
+                Doctor Dashboard
+              </h1>
+            </div>
+            
+            <div className="header-right">
+              {/* Search Bar */}
+              <div className="header-search">
+                <FaSearch className="search-icon-header" />
+                <input
+                  type="text"
+                  placeholder="Search anything..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input-header"
+                />
+              </div>
+            </div>
+          </header>
 
-      {/* Alert Response Modal */}
+          {/* Content Area */}
+          <div className="dashboard-content">
+            {activeTab === 'overview' && renderOverview()}
+            {activeTab === 'appointments' && renderAppointments()}
+            {activeTab === 'patients' && renderPatients()}
+            {activeTab === 'medical-records' && renderMedicalRecords()}
+            {activeTab === 'medical-reports' && renderMedicalReports()}
+            {activeTab === 'prescriptions' && renderPrescriptions()}
+            {activeTab === 'emergency-alerts' && renderEmergencyAlerts()}
+            {activeTab === 'messages' && (
+              <div className="text-center py-12">
+                <FaComments className="text-6xl text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">Messages Coming Soon</h3>
+                <p className="text-gray-500">This feature is currently under development.</p>
+              </div>
+            )}
+            {activeTab === 'help' && (
+              <div className="text-center py-12">
+                <FaQuestionCircle className="text-6xl text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">Help & Support</h3>
+                <p className="text-gray-500">Contact support at support@prohealth.com</p>
+              </div>
+            )}
+          </div>
 
-        </div>
+          {/* Footer */}
+          <Footer />
+        </main>
+
+
+        {/* Modal */}
+        {renderModal()}
+
+        {/* Alert Response Modal */}
+        {showAlertResponseModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-t-lg">
+                <h2 className="text-2xl font-bold">Respond to Emergency Alert</h2>
+              </div>
+              
+              {selectedAlert && (
+                <div className="p-6 space-y-6">
+                  {/* Alert Summary */}
+                  <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                    <h3 className="font-bold text-lg mb-2">
+                      {selectedAlert.emergencyType.replace(/_/g, ' ').toUpperCase()}
+                    </h3>
+                    <p className="text-sm mb-2"><strong>Patient:</strong> {selectedAlert.patientName}</p>
+                    <p className="text-sm mb-2"><strong>Severity:</strong> <span className="uppercase font-bold">{selectedAlert.severity}</span></p>
+                    <p className="text-sm"><strong>Description:</strong> {selectedAlert.description}</p>
+                  </div>
+
+                  {/* Response Input */}
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">
+                      Your Response Message *
+                    </label>
+                    <textarea
+                      value={alertResponse}
+                      onChange={(e) => setAlertResponse(e.target.value)}
+                      rows="6"
+                      placeholder="Provide instructions, advice, or next steps for the patient..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                      required
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      This message will be saved with the alert and sent to the patient.
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleRespondToAlert}
+                      disabled={!alertResponse.trim()}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                    >
+                      Send Response
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAlertResponseModal(false);
+                        setSelectedAlert(null);
+                        setAlertResponse('');
+                      }}
+                      className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

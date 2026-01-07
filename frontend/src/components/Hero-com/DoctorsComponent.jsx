@@ -29,41 +29,41 @@ const DoctorsComponent = () => {
       const response = await getAllDoctors();
       const apiDoctors = response.doctors || [];
       
-      // Merge static doctors with API doctors
-      // API doctors take precedence, but we assign images to those without them
-      const mergedDoctors = [
-        ...staticDoctors.map(staticDoc => ({
-          ...staticDoc,
-          _id: staticDoc._id,
-          name: staticDoc.name,
-          image: staticDoc.image,
-          specialization: staticDoc.speciality || staticDoc.specialization,
-          degree: staticDoc.degree,
-          experience: staticDoc.experience,
-          fees: staticDoc.fees,
-          address: staticDoc.address,
-          available: true,
-          availability: 'Mon-Fri: 9AM-5PM'
-        })),
-        ...apiDoctors.map((apiDoc, index) => ({
-          ...apiDoc,
-          // If API doctor doesn't have an image, assign one from static doctors
-          image: apiDoc.image || staticDoctors[index % staticDoctors.length]?.image,
-          // Ensure specialization field exists
-          specialization: apiDoc.specialization || apiDoc.speciality || 'General',
-          // Set default values for missing fields
-          degree: apiDoc.degree || 'MBBS',
-          experience: apiDoc.experience || 'N/A',
-          fees: apiDoc.fees || 50,
-          available: apiDoc.available !== undefined ? apiDoc.available : true,
-          availability: apiDoc.availability || 'Mon-Fri: 9AM-5PM'
-        }))
-      ];
+      // Use API doctors if available, otherwise fall back to static doctors
+      // Always use static imported images to ensure they display correctly
+      const processedDoctors = apiDoctors.length > 0 
+        ? apiDoctors.map((apiDoc, index) => ({
+            ...apiDoc,
+            // Always use static doctor images (they are properly imported modules)
+            // API image URLs often don't work, so we override with static images
+            image: staticDoctors[index % staticDoctors.length]?.image || apiDoc.image,
+            // Ensure specialization field exists
+            specialization: apiDoc.specialization || apiDoc.speciality || 'General',
+            // Set default values for missing fields
+            degree: apiDoc.degree || 'MBBS',
+            experience: apiDoc.experience || 'N/A',
+            fees: apiDoc.fees || 50,
+            available: apiDoc.available !== undefined ? apiDoc.available : true,
+            availability: apiDoc.availability || 'Mon-Fri: 9AM-5PM'
+          }))
+        : staticDoctors.map(staticDoc => ({
+            ...staticDoc,
+            _id: staticDoc._id,
+            name: staticDoc.name,
+            image: staticDoc.image,
+            specialization: staticDoc.speciality || staticDoc.specialization,
+            degree: staticDoc.degree,
+            experience: staticDoc.experience,
+            fees: staticDoc.fees,
+            address: staticDoc.address,
+            available: true,
+            availability: 'Mon-Fri: 9AM-5PM'
+          }));
       
-      setDoctors(mergedDoctors);
+      setDoctors(processedDoctors);
 
       // Extract unique specializations for categories
-      const uniqueSpecializations = [...new Set(mergedDoctors.map(doctor => doctor.specialization).filter(Boolean))];
+      const uniqueSpecializations = [...new Set(processedDoctors.map(doctor => doctor.specialization).filter(Boolean))];
       setCategories(uniqueSpecializations);
     } catch (error) {
       console.error('Error fetching doctors:', error);

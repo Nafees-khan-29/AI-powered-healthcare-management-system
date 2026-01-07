@@ -126,7 +126,7 @@ export const doctors = [
     },
     {
         _id: '674d1a2b3c4d5e6f7a8b9c0f',
-        name: 'Dr. Emily Rodriguez',
+        name: 'Dr. Nazra khan',
         image: doc13,
         speciality: 'Pediatrics',
         degree: 'MD',
