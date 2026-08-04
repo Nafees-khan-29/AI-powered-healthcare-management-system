@@ -69,7 +69,7 @@ This system aims to automate and optimize core healthcare management tasks using
      ```
    - Frontend:
      ```bash
-     npm start
+     npm run dev
      ```
 
 ## Usage
